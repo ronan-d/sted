@@ -35,6 +35,7 @@ pub fn build(b: *std.Build) void {
 
     exe.root_module.linkSystemLibrary("gtk4", .{});
     exe.root_module.linkSystemLibrary("gtksourceview-5", .{});
+    exe.root_module.linkSystemLibrary("adwaita-1", .{});
 
     b.installArtifact(exe);
 
