@@ -24,7 +24,7 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    for ([_][]const u8{ "main.c", "stedapp.c" }) |f| {
+    for ([_][]const u8{ "main.c", "stedapp.c", "stedwindow.c" }) |f| {
         const cfile = std.Build.Module.CSourceFile{
             .file = b.path(f),
         };
