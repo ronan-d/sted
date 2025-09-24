@@ -41,6 +41,7 @@ static void register_accel(GtkApplication *app, const char *name,
 static void sted_app_activate(GApplication *app) {
   StedWindow *win = sted_window_new(GTK_APPLICATION(app));
 
+  register_accel(GTK_APPLICATION(app), "open-num-dialog", GDK_KEY_a);
   register_accel(GTK_APPLICATION(app), "go-left", GDK_KEY_h);
   register_accel(GTK_APPLICATION(app), "go-down", GDK_KEY_j);
   register_accel(GTK_APPLICATION(app), "go-up", GDK_KEY_k);

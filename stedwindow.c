@@ -3,6 +3,7 @@
 #include "structs.h"
 
 #include <gtksourceview/gtksource.h>
+#include <stdlib.h>
 
 struct renderer {
   GtkTextBuffer *buffer;
@@ -14,6 +15,7 @@ struct _StedWindow {
 
   struct renderer renderer;
   void *srcprg;
+  AdwDialog *dialog;
 };
 
 static void render_frame(struct renderer renderer, struct frame frame) {
@@ -32,6 +34,23 @@ G_DEFINE_TYPE(StedWindow, sted_window, ADW_TYPE_APPLICATION_WINDOW)
 
 static void sted_window_class_init(StedWindowClass *class) {}
 
+static void process_dialog_input(GtkEntry *entry, gpointer ptr) {
+  StedWindow *win = ptr;
+
+  adw_dialog_close(win->dialog);
+
+  const char *text = gtk_entry_buffer_get_text(gtk_entry_get_buffer(entry));
+
+  char *tailptr;
+  errno = 0;
+  const unsigned num = strtoul(text, &tailptr, 10);
+
+  if (errno == 0 && tailptr != text && *tailptr == 0) {
+    struct frame frame = replace_cursor_with_number(win->srcprg, num);
+    render_frame(win->renderer, frame);
+  }
+}
+
 #define declare_cb(cmd)                                                        \
   static void cmd##_cb(GSimpleAction *action, GVariant *parameter,             \
                        gpointer ptr) {                                         \
@@ -47,7 +66,15 @@ declare_cb(make_into_hole);
 declare_cb(insert_before);
 declare_cb(insert_after);
 
+static void open_num_dialog(GSimpleAction *action, GVariant *parameter,
+                            gpointer ptr) {
+  StedWindow *win = ptr;
+
+  adw_dialog_present(win->dialog, GTK_WIDGET(win));
+}
+
 const static GActionEntry app_entries[] = {
+    {"open-num-dialog", open_num_dialog, NULL, NULL, NULL},
     {"go-left", go_left_cb, NULL, NULL, NULL},
     {"go-down", go_down_cb, NULL, NULL, NULL},
     {"go-up", go_up_cb, NULL, NULL, NULL},
@@ -94,6 +121,18 @@ static void sted_window_init(StedWindow *self) {
 
   g_action_map_add_action_entries(G_ACTION_MAP(self), app_entries,
                                   G_N_ELEMENTS(app_entries), self);
+
+  GtkWidget *entry = gtk_entry_new();
+
+  g_signal_connect(entry, "activate", G_CALLBACK(process_dialog_input), self);
+
+  AdwDialog *dialog = adw_dialog_new();
+
+  adw_dialog_set_child(dialog, entry);
+  adw_dialog_set_follows_content_size(dialog, TRUE);
+  adw_dialog_set_presentation_mode(dialog, ADW_DIALOG_FLOATING);
+
+  self->dialog = dialog;
 }
 
 StedWindow *sted_window_new(GtkApplication *application) {

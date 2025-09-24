@@ -174,6 +174,10 @@ const Srcprg = struct {
             }
         }
     }
+
+    fn replace_cursor_with_number(self: *@This(), num: u64) void {
+        overwrite_expr(self.cursor(), Expr{ .e_const = num });
+    }
 };
 
 export fn create_srcprg() ?*anyopaque {
@@ -238,6 +242,14 @@ export fn execute(srcprg_opaque: *anyopaque, instr: c_interface.instruction) c_i
     } else if (instr == c_interface.insert_before or instr == c_interface.insert_after) {
         srcprg.insert_before_or_after(instr) catch std.process.exit(1);
     }
+
+    return render(srcprg) catch std.process.exit(1);
+}
+
+export fn replace_cursor_with_number(srcprg_opaque: *anyopaque, num: c_uint) c_interface.frame {
+    const srcprg: *Srcprg = @ptrCast(@alignCast(srcprg_opaque));
+
+    srcprg.replace_cursor_with_number(@intCast(num));
 
     return render(srcprg) catch std.process.exit(1);
 }
