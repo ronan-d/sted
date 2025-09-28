@@ -178,6 +178,13 @@ const Srcprg = struct {
     fn replace_cursor_with_number(self: *@This(), num: u64) void {
         overwrite_expr(self.cursor(), Expr{ .e_const = num });
     }
+
+    fn replace_cursor_with_op(self: @This(), op: AssOp) !void {
+        var args = try OpList.initCapacity(cator, 2);
+        args.appendAssumeCapacity(Expr.e_hole);
+        args.appendAssumeCapacity(Expr.e_hole);
+        overwrite_expr(self.cursor(), Expr{ .e_assop = .{ .o = op, .args = args } });
+    }
 };
 
 export fn create_srcprg() ?*anyopaque {
@@ -250,6 +257,22 @@ export fn replace_cursor_with_number(srcprg_opaque: *anyopaque, num: c_uint) c_i
     const srcprg: *Srcprg = @ptrCast(@alignCast(srcprg_opaque));
 
     srcprg.replace_cursor_with_number(@intCast(num));
+
+    return render(srcprg) catch std.process.exit(1);
+}
+
+export fn replace_cursor_with_addition(srcprg_opaque: *anyopaque) c_interface.frame {
+    const srcprg: *Srcprg = @ptrCast(@alignCast(srcprg_opaque));
+
+    srcprg.replace_cursor_with_op(.add) catch std.process.exit(1);
+
+    return render(srcprg) catch std.process.exit(1);
+}
+
+export fn replace_cursor_with_multiplication(srcprg_opaque: *anyopaque) c_interface.frame {
+    const srcprg: *Srcprg = @ptrCast(@alignCast(srcprg_opaque));
+
+    srcprg.replace_cursor_with_op(.mul) catch std.process.exit(1);
 
     return render(srcprg) catch std.process.exit(1);
 }

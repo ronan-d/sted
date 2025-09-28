@@ -37,8 +37,6 @@ static void sted_window_class_init(StedWindowClass *class) {}
 static void process_dialog_input(GtkEntry *entry, gpointer ptr) {
   StedWindow *win = ptr;
 
-  adw_dialog_close(win->dialog);
-
   const char *text = gtk_entry_buffer_get_text(gtk_entry_get_buffer(entry));
 
   char *tailptr;
@@ -49,6 +47,8 @@ static void process_dialog_input(GtkEntry *entry, gpointer ptr) {
     struct frame frame = replace_cursor_with_number(win->srcprg, num);
     render_frame(win->renderer, frame);
   }
+
+  adw_dialog_close(win->dialog);
 }
 
 #define declare_cb(cmd)                                                        \
@@ -66,10 +66,13 @@ declare_cb(make_into_hole);
 declare_cb(insert_before);
 declare_cb(insert_after);
 
+static AdwDialog *create_input_dialog(StedWindow *win);
+
 static void open_num_dialog(GSimpleAction *action, GVariant *parameter,
                             gpointer ptr) {
   StedWindow *win = ptr;
 
+  win->dialog = create_input_dialog(win);
   adw_dialog_present(win->dialog, GTK_WIDGET(win));
 }
 
@@ -82,6 +85,64 @@ const static GActionEntry app_entries[] = {
     {"make-into-hole", make_into_hole_cb, NULL, NULL, NULL},
     {"insert-before", insert_before_cb, NULL, NULL, NULL},
     {"insert-after", insert_after_cb, NULL, NULL, NULL}};
+
+static void addition_cb(GtkButton *button, gpointer ptr) {
+  StedWindow *win = ptr;
+
+  struct frame frame = replace_cursor_with_addition(win->srcprg);
+  render_frame(win->renderer, frame);
+  adw_dialog_close(win->dialog);
+}
+
+static void multiplication_cb(GtkButton *button, gpointer ptr) {
+  StedWindow *win = ptr;
+
+  struct frame frame = replace_cursor_with_multiplication(win->srcprg);
+  render_frame(win->renderer, frame);
+  adw_dialog_close(win->dialog);
+}
+
+static void number_cb(GtkButton *button, gpointer ptr) {
+  StedWindow *win = ptr;
+
+  GtkWidget *entry = gtk_entry_new();
+  g_signal_connect(entry, "activate", G_CALLBACK(process_dialog_input), win);
+
+  adw_dialog_set_child(win->dialog, entry);
+  gtk_widget_grab_focus (entry);
+}
+
+static AdwDialog *create_input_dialog(StedWindow *win) {
+  GtkBox *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+
+  {
+    GtkWidget *button = gtk_button_new_with_mnemonic("Insert _number");
+    g_signal_connect(GTK_BUTTON(button), "clicked", G_CALLBACK(number_cb), win);
+    gtk_box_append(box, button);
+  }
+
+  {
+    GtkWidget *abutton = gtk_button_new_with_mnemonic("Insert _addition");
+    g_signal_connect(GTK_BUTTON(abutton), "clicked", G_CALLBACK(addition_cb),
+                     win);
+    gtk_box_append(box, abutton);
+  }
+
+  {
+    GtkWidget *mbutton = gtk_button_new_with_mnemonic("Insert _multiplication");
+    g_signal_connect(GTK_BUTTON(mbutton), "clicked",
+                     G_CALLBACK(multiplication_cb), win);
+    gtk_box_append(box, mbutton);
+  }
+
+  AdwDialog *dialog = adw_dialog_new();
+
+  adw_dialog_set_child(dialog, box);
+  adw_dialog_set_follows_content_size(dialog, TRUE);
+  adw_dialog_set_presentation_mode(dialog, ADW_DIALOG_FLOATING);
+
+  return dialog;
+}
 
 static void sted_window_init(StedWindow *self) {
   gtk_window_set_title(GTK_WINDOW(self), "Hello");
@@ -121,18 +182,6 @@ static void sted_window_init(StedWindow *self) {
 
   g_action_map_add_action_entries(G_ACTION_MAP(self), app_entries,
                                   G_N_ELEMENTS(app_entries), self);
-
-  GtkWidget *entry = gtk_entry_new();
-
-  g_signal_connect(entry, "activate", G_CALLBACK(process_dialog_input), self);
-
-  AdwDialog *dialog = adw_dialog_new();
-
-  adw_dialog_set_child(dialog, entry);
-  adw_dialog_set_follows_content_size(dialog, TRUE);
-  adw_dialog_set_presentation_mode(dialog, ADW_DIALOG_FLOATING);
-
-  self->dialog = dialog;
 }
 
 StedWindow *sted_window_new(GtkApplication *application) {
