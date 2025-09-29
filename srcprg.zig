@@ -109,70 +109,43 @@ const Srcprg = struct {
         }
     }
 
-    fn go_left_or_right(self: *@This(), dir: c_interface.instruction) void {
-        if (self.cursor_stack.pop()) |c| {
-            const p = self.cursor();
-
-            switch (p.*) {
-                .e_assop => |assop| {
-                    const idx = c - assop.args.items.ptr;
-
-                    const new_idx = blk: {
-                        if (dir == c_interface.go_left) {
-                            if (idx == 0) {
-                                break :blk 0;
-                            } else {
-                                break :blk idx - 1;
-                            }
-                        }
-
-                        if (dir == c_interface.go_right) {
-                            if (idx + 1 < assop.args.items.len) {
-                                break :blk idx + 1;
-                            } else {
-                                break :blk idx;
-                            }
-                        }
-
-                        unreachable;
-                    };
-
-                    self.cursor_stack.appendAssumeCapacity(&assop.args.items[new_idx]);
-                },
-                else => unreachable,
+    fn go_left_or_right(self: *@This(), dir: c_interface.instruction) !void {
+        const ls = struct {
+            fn edit(args: *OpList, idx: usize) std.mem.Allocator.Error!usize {
+                _ = args;
+                return if (idx == 0) 0 else idx - 1;
             }
-        }
-        if (dir == c_interface.go_left) {} else if (dir == c_interface.go_right) {} else {
-            unreachable;
-        }
+        };
+        const rs = struct {
+            fn edit(args: *OpList, idx: usize) std.mem.Allocator.Error!usize {
+                return if (idx + 1 < args.items.len) idx + 1 else idx;
+            }
+        };
+
+        try self.list_edit(if (dir == c_interface.go_left) ls.edit else rs.edit);
     }
 
     fn insert_before_or_after(self: *@This(), instr: c_interface.instruction) !void {
-        if (self.cursor_stack.pop()) |c| {
-            const p = self.cursor();
+        const ls = struct {
+            fn edit(args: *OpList, idx: usize) std.mem.Allocator.Error!usize {
+                const i = idx;
 
-            switch (p.*) {
-                .e_assop => |*assop| {
-                    const idx = c - assop.args.items.ptr;
+                try args.insert(cator, i, Expr.e_hole);
 
-                    const i = blk: {
-                        if (instr == c_interface.insert_before) {
-                            break :blk idx;
-                        }
-                        if (instr == c_interface.insert_after) {
-                            break :blk idx + 1;
-                        }
-
-                        unreachable;
-                    };
-
-                    try assop.args.insert(cator, i, Expr.e_hole);
-
-                    self.cursor_stack.appendAssumeCapacity(&assop.args.items[i]);
-                },
-                else => unreachable,
+                return i;
             }
-        }
+        };
+        const rs = struct {
+            fn edit(args: *OpList, idx: usize) std.mem.Allocator.Error!usize {
+                const i = idx + 1;
+
+                try args.insert(cator, i, Expr.e_hole);
+
+                return i;
+            }
+        };
+
+        try self.list_edit(if (instr == c_interface.insert_before) ls.edit else rs.edit);
     }
 
     fn replace_cursor_with_number(self: *@This(), num: u64) void {
@@ -184,6 +157,23 @@ const Srcprg = struct {
         args.appendAssumeCapacity(Expr.e_hole);
         args.appendAssumeCapacity(Expr.e_hole);
         overwrite_expr(self.cursor(), Expr{ .e_assop = .{ .o = op, .args = args } });
+    }
+
+    fn list_edit(self: *@This(), f: *const fn (*OpList, usize) std.mem.Allocator.Error!usize) !void {
+        if (self.cursor_stack.pop()) |c| {
+            const p = self.cursor();
+
+            switch (p.*) {
+                .e_assop => |*assop| {
+                    const idx = c - assop.args.items.ptr;
+
+                    const i = try f(&assop.args, idx);
+
+                    self.cursor_stack.appendAssumeCapacity(&assop.args.items[i]);
+                },
+                else => unreachable,
+            }
+        }
     }
 };
 
@@ -234,7 +224,7 @@ export fn execute(srcprg_opaque: *anyopaque, instr: c_interface.instruction) c_i
     if (instr == c_interface.go_up) {
         _ = srcprg.cursor_stack.pop();
     } else if (instr == c_interface.go_left or instr == c_interface.go_right) {
-        srcprg.go_left_or_right(instr);
+        srcprg.go_left_or_right(instr) catch std.process.exit(1);
     } else if (instr == c_interface.go_down) {
         switch (srcprg.cursor().*) {
             .e_assop => |op| {
