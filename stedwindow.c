@@ -65,6 +65,7 @@ declare_cb(go_right);
 declare_cb(make_into_hole);
 declare_cb(insert_before);
 declare_cb(insert_after);
+declare_cb(remove_cursor_node);
 
 static AdwDialog *create_input_dialog(StedWindow *win);
 
@@ -84,7 +85,8 @@ const static GActionEntry app_entries[] = {
     {"go-right", go_right_cb, NULL, NULL, NULL},
     {"make-into-hole", make_into_hole_cb, NULL, NULL, NULL},
     {"insert-before", insert_before_cb, NULL, NULL, NULL},
-    {"insert-after", insert_after_cb, NULL, NULL, NULL}};
+    {"insert-after", insert_after_cb, NULL, NULL, NULL},
+    {"remove-cursor-node", remove_cursor_node_cb, NULL, NULL, NULL}};
 
 static void addition_cb(GtkButton *button, gpointer ptr) {
   StedWindow *win = ptr;

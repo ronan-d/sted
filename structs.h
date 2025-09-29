@@ -15,5 +15,6 @@ enum instruction {
   go_right,
   make_into_hole,
   insert_before,
-  insert_after
+  insert_after,
+  remove_cursor_node
 };

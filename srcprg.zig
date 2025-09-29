@@ -175,6 +175,37 @@ const Srcprg = struct {
             }
         }
     }
+
+    fn remove_cursor_node(self: *@This()) !void {
+        const t = struct {
+            fn edit(args: *OpList, idx: usize) std.mem.Allocator.Error!usize {
+                var x = args.orderedRemove(idx);
+                free_children(&x);
+                return if (idx < args.items.len) idx else idx - 1;
+            }
+        };
+
+        try self.list_edit(t.edit);
+
+        // If we have an operation with just one operand, we replace it with the
+        // operand itself.
+
+        if (self.cursor_stack.pop()) |c| {
+            const p = self.cursor();
+
+            switch (p.*) {
+                .e_assop => |*assop| {
+                    if (assop.args.items.len == 1) {
+                        overwrite_expr(p, c.*);
+                        return;
+                    }
+                },
+                else => {},
+            }
+
+            self.cursor_stack.appendAssumeCapacity(c);
+        }
+    }
 };
 
 export fn create_srcprg() ?*anyopaque {
@@ -238,8 +269,9 @@ export fn execute(srcprg_opaque: *anyopaque, instr: c_interface.instruction) c_i
         overwrite_expr(top, .e_hole);
     } else if (instr == c_interface.insert_before or instr == c_interface.insert_after) {
         srcprg.insert_before_or_after(instr) catch std.process.exit(1);
+    } else if (instr == c_interface.remove_cursor_node) {
+        srcprg.remove_cursor_node() catch std.process.exit(1);
     }
-
     return render(srcprg) catch std.process.exit(1);
 }
 
@@ -265,4 +297,16 @@ export fn replace_cursor_with_multiplication(srcprg_opaque: *anyopaque) c_interf
     srcprg.replace_cursor_with_op(.mul) catch std.process.exit(1);
 
     return render(srcprg) catch std.process.exit(1);
+}
+
+fn free_children(node: *Expr) void {
+    switch (node.*) {
+        .e_assop => |*op| {
+            for (op.args.items) |*arg| {
+                free_children(arg);
+            }
+            op.args.clearAndFree(cator);
+        },
+        else => {},
+    }
 }

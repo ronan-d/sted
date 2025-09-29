@@ -49,6 +49,7 @@ static void sted_app_activate(GApplication *app) {
   register_accel(GTK_APPLICATION(app), "make-into-hole", GDK_KEY_f);
   register_accel(GTK_APPLICATION(app), "insert-before", GDK_KEY_s);
   register_accel(GTK_APPLICATION(app), "insert-after", GDK_KEY_d);
+  register_accel(GTK_APPLICATION(app), "remove-cursor-node", GDK_KEY_r);
 
   gtk_window_present(GTK_WINDOW(win));
 }
