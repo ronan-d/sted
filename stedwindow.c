@@ -109,7 +109,7 @@ static void number_cb(GtkButton *button, gpointer ptr) {
   g_signal_connect(entry, "activate", G_CALLBACK(process_dialog_input), win);
 
   adw_dialog_set_child(win->dialog, entry);
-  gtk_widget_grab_focus (entry);
+  gtk_widget_grab_focus(entry);
 }
 
 static AdwDialog *create_input_dialog(StedWindow *win) {
