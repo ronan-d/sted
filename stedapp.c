@@ -35,6 +35,7 @@ static void register_accel(GtkApplication *app, const char *name,
 
   gtk_application_set_accels_for_action(app, qualified_name, accels);
 
+  free(accel);
   free(qualified_name);
 }
 
