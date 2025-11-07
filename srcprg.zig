@@ -239,13 +239,7 @@ fn render(srcprg: *Srcprg) !c_interface.frame {
 }
 
 fn overwrite_expr(p: *Expr, v: Expr) void {
-    switch (p.*) {
-        .e_const, .e_hole => {},
-        .e_assop => |*op| {
-            op.args.clearAndFree(cator);
-        },
-    }
-
+    free_children(p);
     p.* = v;
 }
 
