@@ -22,9 +22,71 @@ const Expr = union(enum) {
     e_const: u64,
     e_assop: struct { o: AssOp, args: OpList },
     e_hole,
+
+    fn free_children(node: *Expr) void {
+        switch (node.*) {
+            .e_assop => |*op| {
+                for (op.args.items) |*arg| {
+                    free_children(arg);
+                }
+                op.args.clearAndFree(cator);
+            },
+            else => {},
+        }
+    }
 };
 
-fn create_example_expr() !struct { root: *Expr, cursor: *ThreadCursor } {
+const Com = union(enum) {
+    skip,
+    asgn: struct { x: *Id, a: *Expr },
+    hole,
+
+    pub fn free_children(c: *Com) void {
+        switch (c.*) {
+            .asgn => |p| p.a.free_children(),
+            else => {},
+        }
+    }
+
+    pub fn render(
+        c: *const Com,
+        cursor: usize,
+        buf: *Buffer,
+        start: *c_int,
+        end: *c_int,
+    ) !void {
+        if (@intFromPtr(c) == cursor) {
+            start.* = @intCast(buf.items.len);
+        }
+
+        switch (c.*) {
+            .skip => {
+                try buf.appendSlice(cator, "skip");
+            },
+            .asgn => |asgn| {
+                try asgn.x.render(cursor, buf, start, end);
+                try buf.appendSlice(cator, " := ");
+                try render_expr(asgn.a, cursor, AssOp.add, buf, start, end);
+            },
+            .hole => {
+                try buf.appendSlice(cator, "◆");
+            },
+        }
+
+        if (@intFromPtr(c) == cursor) {
+            end.* = @intCast(buf.items.len);
+        }
+    }
+
+    pub fn overwrite(p: *Com, c: Com) void {
+        p.free_children();
+        p.* = c;
+    }
+};
+
+const ComSeq = std.ArrayList(Com);
+
+fn create_example_tree() !struct { root: *Com, cursor: *ThreadCursor } {
     const e3 = try cator.create(Expr);
     e3.* = Expr{ .e_const = 3 };
 
@@ -44,18 +106,34 @@ fn create_example_expr() !struct { root: *Expr, cursor: *ThreadCursor } {
         break :blk Expr{ .e_assop = .{ .o = .add, .args = args } };
     };
 
+    const i = try cator.create(Id);
+    i.* = .{ .id = "foo" };
+
+    const c = try cator.create(Com);
+    c.* = .{ .asgn = .{ .x = i, .a = ep } };
+
     const p = try cator.create(ThreadCursor);
-    p.* = ThreadCursor.init(ep);
+    p.* = ThreadCursor.init(c);
 
     p.start();
 
     p.perform(.go_down);
     p.perform(.go_right);
 
-    return .{ .root = ep, .cursor = p };
+    p.perform(.go_down);
+    p.perform(.go_right);
+
+    return .{ .root = c, .cursor = p };
 }
 
-fn render_node(e: *const Expr, cursor: usize, parent_op: AssOp, buf: *Buffer, start: *c_int, end: *c_int) !void {
+fn render_expr(
+    e: *const Expr,
+    cursor: usize,
+    parent_op: AssOp,
+    buf: *Buffer,
+    start: *c_int,
+    end: *c_int,
+) !void {
     if (@intFromPtr(e) == cursor) {
         start.* = @intCast(buf.items.len);
     }
@@ -70,7 +148,7 @@ fn render_node(e: *const Expr, cursor: usize, parent_op: AssOp, buf: *Buffer, st
             }
 
             if (op.args.items.len > 0) {
-                try render_node(&op.args.items[0], cursor, op.o, buf, start, end);
+                try render_expr(&op.args.items[0], cursor, op.o, buf, start, end);
 
                 for (op.args.items[1..]) |*arg| {
                     try buf.append(cator, ' ');
@@ -79,7 +157,7 @@ fn render_node(e: *const Expr, cursor: usize, parent_op: AssOp, buf: *Buffer, st
                         .mul => '*',
                     });
                     try buf.append(cator, ' ');
-                    try render_node(arg, cursor, op.o, buf, start, end);
+                    try render_expr(arg, cursor, op.o, buf, start, end);
                 }
             }
 
@@ -107,56 +185,13 @@ fn new_op(op: AssOp) !Expr {
 const Buffer = std.ArrayList(u8);
 
 const Srcprg = struct {
-    tree: *Expr,
+    tree: *Com,
     cursor: *ThreadCursor,
     buf: Buffer,
-
-    fn go_left_or_right(self: *@This(), dir: c_interface.instruction) !void {
-        const ls = struct {
-            fn edit(args: *OpList, idx: usize) std.mem.Allocator.Error!usize {
-                _ = args;
-                return if (idx == 0) 0 else idx - 1;
-            }
-        };
-        const rs = struct {
-            fn edit(args: *OpList, idx: usize) std.mem.Allocator.Error!usize {
-                return if (idx + 1 < args.items.len) idx + 1 else idx;
-            }
-        };
-
-        try self.list_edit(if (dir == c_interface.go_left) ls.edit else rs.edit);
-    }
-
-    fn insert_before_or_after(self: *@This(), instr: c_interface.instruction) !void {
-        const ls = struct {
-            fn edit(args: *OpList, idx: usize) std.mem.Allocator.Error!usize {
-                const i = idx;
-
-                try args.insert(cator, i, Expr.e_hole);
-
-                return i;
-            }
-        };
-        const rs = struct {
-            fn edit(args: *OpList, idx: usize) std.mem.Allocator.Error!usize {
-                const i = idx + 1;
-
-                try args.insert(cator, i, Expr.e_hole);
-
-                return i;
-            }
-        };
-
-        try self.list_edit(if (instr == c_interface.insert_before) ls.edit else rs.edit);
-    }
-
-    fn replace_cursor_with_number(self: *@This(), num: u64) void {
-        overwrite_expr(self.cursor(), Expr{ .e_const = num });
-    }
 };
 
 export fn create_srcprg() ?*anyopaque {
-    const x = create_example_expr() catch return null;
+    const x = create_example_tree() catch return null;
 
     const s = cator.create(Srcprg) catch return null;
     s.tree = x.root;
@@ -171,10 +206,8 @@ fn render(srcprg: *Srcprg) !c_interface.frame {
 
     var start: c_int = undefined;
     var end: c_int = undefined;
-    try render_node(
-        srcprg.tree,
-        srcprg.cursor.cursor_pos,
-        AssOp.add,
+    try srcprg.tree.render(
+        srcprg.cursor.cursor_pos.to_int(),
         &srcprg.buf,
         &start,
         &end,
@@ -193,7 +226,7 @@ fn render(srcprg: *Srcprg) !c_interface.frame {
 }
 
 fn overwrite_expr(p: *Expr, v: Expr) void {
-    free_children(p);
+    p.free_children();
     p.* = v;
 }
 
@@ -224,10 +257,12 @@ export fn execute(srcprg_opaque: *anyopaque, instr: c_interface.instruction) c_i
 export fn replace_cursor_with_number(srcprg_opaque: *anyopaque, num: c_uint) c_interface.frame {
     const srcprg: *Srcprg = @ptrCast(@alignCast(srcprg_opaque));
 
-    const new_expr = cator.create(Expr) catch std.process.exit(1);
-    new_expr.* = .{ .e_const = @intCast(num) };
-
-    srcprg.cursor.perform(.{ .replace_with = .{ .e_const = @intCast(num) } });
+    switch (srcprg.cursor.cursor_pos) {
+        .expr => |e| {
+            overwrite_expr(e, .{ .e_const = @intCast(num) });
+        },
+        else => {},
+    }
 
     return render(srcprg) catch std.process.exit(1);
 }
@@ -235,7 +270,12 @@ export fn replace_cursor_with_number(srcprg_opaque: *anyopaque, num: c_uint) c_i
 export fn replace_cursor_with_addition(srcprg_opaque: *anyopaque) c_interface.frame {
     const srcprg: *Srcprg = @ptrCast(@alignCast(srcprg_opaque));
 
-    srcprg.cursor.perform(.{ .replace_with = new_op(.add) catch std.process.exit(1) });
+    switch (srcprg.cursor.cursor_pos) {
+        .expr => |e| {
+            overwrite_expr(e, new_op(.add) catch std.process.exit(1));
+        },
+        else => {},
+    }
 
     return render(srcprg) catch std.process.exit(1);
 }
@@ -243,21 +283,14 @@ export fn replace_cursor_with_addition(srcprg_opaque: *anyopaque) c_interface.fr
 export fn replace_cursor_with_multiplication(srcprg_opaque: *anyopaque) c_interface.frame {
     const srcprg: *Srcprg = @ptrCast(@alignCast(srcprg_opaque));
 
-    srcprg.cursor.perform(.{ .replace_with = new_op(.mul) catch std.process.exit(1) });
-
-    return render(srcprg) catch std.process.exit(1);
-}
-
-fn free_children(node: *Expr) void {
-    switch (node.*) {
-        .e_assop => |*op| {
-            for (op.args.items) |*arg| {
-                free_children(arg);
-            }
-            op.args.clearAndFree(cator);
+    switch (srcprg.cursor.cursor_pos) {
+        .expr => |e| {
+            overwrite_expr(e, new_op(.mul) catch std.process.exit(1));
         },
         else => {},
     }
+
+    return render(srcprg) catch std.process.exit(1);
 }
 
 const ThreadCursor = struct {
@@ -266,8 +299,8 @@ const ThreadCursor = struct {
     mutex: th.Mutex,
     cond: th.Condition,
     pending_instruction: ?instruction,
-    root: *Expr,
-    cursor_pos: usize,
+    root: *Com,
+    cursor_pos: NodePtr,
 
     const Self = @This();
 
@@ -280,7 +313,6 @@ const ThreadCursor = struct {
         insert_after,
         make_into_hole,
         remove_cursor_node,
-        replace_with: Expr,
     };
 
     pub fn perform(self: *Self, instr: instruction) void {
@@ -312,20 +344,20 @@ const ThreadCursor = struct {
         }
     }
 
-    fn report_completion(self: *Self, cursor_pos: usize) void {
+    fn report_completion(self: *Self, cursor_pos: NodePtr) void {
         self.pending_instruction = null;
         self.cursor_pos = cursor_pos;
         self.cond.signal();
         self.mutex.unlock();
     }
 
-    pub fn init(root: *Expr) Self {
+    pub fn init(root: *Com) Self {
         return Self{
             .mutex = .{},
             .cond = .{},
             .pending_instruction = null,
             .root = root,
-            .cursor_pos = @intFromPtr(root),
+            .cursor_pos = .{ .com = root },
         };
     }
 
@@ -352,22 +384,24 @@ const ThreadCursor = struct {
 
     fn thread_main(self: *Self) void {
         while (true) {
-            _ = self.traverse_dynamically(self.root, .none) catch std.process.exit(1);
-            self.report_completion(@intFromPtr(self.root));
+            _ = self.traverse_dynamically(.{ .com = self.root }, .none) catch std.process.exit(1);
+            self.report_completion(.{ .com = self.root });
         }
     }
 
     fn traverse_dynamically(
         self: *Self,
-        node: *Expr,
+        node_on_entry: NodePtr,
         down_instr: down_instruction,
     ) !up_instruction {
         switch (down_instr) {
             .none => {},
             .go_down => {
-                self.report_completion(@intFromPtr(node));
+                self.report_completion(node_on_entry);
             },
         }
+
+        var node = node_on_entry;
 
         while (true) {
             const instr = self.receive();
@@ -377,69 +411,212 @@ const ThreadCursor = struct {
                 .go_up => return .do_nothing,
                 .go_left => return .go_left,
                 .go_down => {
-                    switch (node.*) {
-                        .e_assop => |*op| {
-                            std.debug.assert(op.args.items.len != 0);
+                    if (0 < node.child_count()) {
+                        var i: usize = 0;
 
-                            var i: usize = 0;
+                        while (true) {
+                            const up_instr = try self.traverse_dynamically(
+                                node.get_nth_child(i) orelse std.process.exit(1),
+                                .go_down,
+                            );
 
-                            while (true) {
-                                const up_instr = try self.traverse_dynamically(&op.args.items[i], .go_down);
-
-                                switch (up_instr) {
-                                    .go_left => {
-                                        if (0 < i) {
-                                            i -= 1;
-                                        }
-                                    },
-                                    .go_right => {
-                                        if (i + 1 < op.args.items.len) {
-                                            i += 1;
-                                        }
-                                    },
-                                    .do_nothing => {
-                                        break;
-                                    },
-                                    .insert_before => {
-                                        try op.args.insert(cator, i, .e_hole);
-                                    },
-                                    .insert_after => {
+                            switch (up_instr) {
+                                .go_left => {
+                                    if (0 < i) {
+                                        i -= 1;
+                                    }
+                                },
+                                .go_right => {
+                                    if (i + 1 < node.child_count()) {
                                         i += 1;
-                                        try op.args.insert(cator, i, .e_hole);
-                                    },
-                                    .remove_cursor_node => {
-                                        var x = op.args.orderedRemove(i);
-                                        free_children(&x);
-
-                                        if (op.args.items.len <= i) {
-                                            i -= 1;
-                                        }
-
-                                        if (op.args.items.len == 1) {
-                                            var v = op.args;
-                                            node.* = v.items[0];
-                                            v.clearAndFree(cator);
-                                            break;
-                                        }
-                                    },
-                                }
+                                    }
+                                },
+                                .do_nothing => {
+                                    break;
+                                },
+                                .insert_before => {
+                                    _ = node.insert_at(i);
+                                },
+                                .insert_after => {
+                                    if (node.insert_at(i + 1)) {
+                                        i += 1;
+                                    }
+                                },
+                                .remove_cursor_node => {
+                                    switch (node.remove(i)) {
+                                        .was_replaced => break,
+                                        .now_empty => break,
+                                        .new_index => |j| i = j,
+                                    }
+                                },
                             }
-                        },
-                        else => {},
+                        }
                     }
                 },
                 .insert_before => return .insert_before,
                 .insert_after => return .insert_after,
                 .make_into_hole => {
-                    overwrite_expr(node, .e_hole);
+                    node.make_into_hole();
                 },
                 .remove_cursor_node => return .remove_cursor_node,
-                .replace_with => |new_node| {
-                    overwrite_expr(node, new_node);
-                },
             }
 
-            self.report_completion(@intFromPtr(node));
+            self.report_completion(node);
+        }
+    }
+};
+
+const Id = union(enum) {
+    id: []const u8,
+    hole,
+
+    pub fn render(
+        i: *const Id,
+        cursor: usize,
+        buf: *Buffer,
+        start: *c_int,
+        end: *c_int,
+    ) !void {
+        if (@intFromPtr(i) == cursor) {
+            start.* = @intCast(buf.items.len);
+        }
+
+        switch (i.*) {
+            .id => |s| {
+                try buf.appendSlice(cator, s);
+            },
+            .hole => {
+                try buf.appendSlice(cator, "◆");
+            },
+        }
+
+        if (@intFromPtr(i) == cursor) {
+            end.* = @intCast(buf.items.len);
+        }
+    }
+};
+
+const NodePtr = union(enum) {
+    expr: *Expr,
+    com: *Com,
+    com_seq: *ComSeq,
+    id: *Id,
+
+    const Self = @This();
+
+    pub fn child_count(self: Self) usize {
+        return switch (self) {
+            .expr => |e| switch (e.*) {
+                .e_assop => |p| p.args.items.len,
+                else => 0,
+            },
+            .com => |c| switch (c.*) {
+                .asgn => 2,
+                else => 0,
+            },
+            .com_seq => |s| s.items.len,
+            .id => 0,
+        };
+    }
+
+    pub fn get_nth_child(self: Self, n: usize) ?Self {
+        return switch (self) {
+            .expr => |e| switch (e.*) {
+                .e_assop => |p| if (n < p.args.items.len) .{ .expr = &p.args.items[n] } else null,
+                else => null,
+            },
+            .com => |c| switch (c.*) {
+                .asgn => |*p| switch (n) {
+                    0 => .{ .id = p.x },
+                    1 => .{ .expr = p.a },
+                    else => null,
+                },
+                else => null,
+            },
+            .com_seq => |s| if (n < s.items.len) .{ .com = &s.items[n] } else null,
+            .id => null,
+        };
+    }
+
+    pub fn to_int(self: Self) usize {
+        return switch (self) {
+            .expr => |p| @intFromPtr(p),
+            .com => |p| @intFromPtr(p),
+            .com_seq => |s| @intFromPtr(s),
+            .id => |i| @intFromPtr(i),
+        };
+    }
+
+    // When the operation is not possible because of the structure of the AST,
+    // does nothing and returns false.
+    pub fn insert_at(self: Self, i: usize) bool {
+        switch (self) {
+            .expr => |e| switch (e.*) {
+                .e_assop => |*p| {
+                    if (i <= p.args.items.len) {
+                        p.args.insert(cator, i, .e_hole) catch std.process.exit(1);
+                        return true;
+                    } else {
+                        return false;
+                    }
+                },
+                else => return false,
+            },
+            .com => return false,
+            .com_seq => |s| {
+                if (i <= s.items.len) {
+                    s.insert(cator, i, .hole) catch std.process.exit(1);
+                }
+                return true;
+            },
+            .id => return false,
+        }
+    }
+
+    pub const RemoveRet = union(enum) {
+        was_replaced,
+        now_empty,
+        new_index: usize,
+    };
+
+    pub fn remove(self: Self, i: usize) RemoveRet {
+        switch (self) {
+            .expr => |e| switch (e.*) {
+                .e_assop => |*p| {
+                    var x = p.args.orderedRemove(i);
+                    x.free_children();
+
+                    if (p.args.items.len == 1) {
+                        var v = p.args;
+                        const c = v.items[0];
+                        v.clearAndFree(cator);
+                        e.* = c;
+                        return .was_replaced;
+                    } else if (p.args.items.len <= i) {
+                        return .{ .new_index = i - 1 };
+                    } else {
+                        return .{ .new_index = i };
+                    }
+                },
+                else => return .{ .new_index = i },
+            },
+            .com => return .{ .new_index = i },
+            .com_seq => |s| {
+                var x = s.orderedRemove(i);
+                x.free_children();
+
+                return if (s.items.len == 0) .now_empty else .{ .new_index = if (s.items.len <= i) i - 1 else i };
+            },
+            .id => return .{ .new_index = i },
+        }
+    }
+
+    pub fn make_into_hole(self: Self) void {
+        switch (self) {
+            .expr => |e| overwrite_expr(e, .e_hole),
+            .com => |c| c.overwrite(.hole),
+            .com_seq => {},
+            .id => |i| i.* = .hole,
         }
     }
 };
