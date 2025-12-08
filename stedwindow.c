@@ -1,5 +1,7 @@
-#include "stedwindow.h"
+#include <string.h>
+
 #include "functions.h"
+#include "stedwindow.h"
 #include "structs.h"
 
 #include <gtksourceview/gtksource.h>
@@ -117,25 +119,20 @@ static void number_cb(GtkButton *button, gpointer ptr) {
 static AdwDialog *create_input_dialog(StedWindow *win) {
   GtkBox *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 
-  {
-    GtkWidget *button = gtk_button_new_with_mnemonic("Insert _number");
-    g_signal_connect(GTK_BUTTON(button), "clicked", G_CALLBACK(number_cb), win);
+  char *const offers = get_offers(win->srcprg);
+
+  const char *cursor = offers;
+
+  while (strlen(cursor) > 0) {
+    GtkWidget *button = gtk_button_new_with_mnemonic(cursor);
+    g_signal_connect(GTK_BUTTON(button), "clicked", G_CALLBACK(number_cb),
+                     win); // TODO change callback
     gtk_box_append(box, button);
+
+    cursor += strlen(cursor) + 1;
   }
 
-  {
-    GtkWidget *abutton = gtk_button_new_with_mnemonic("Insert _addition");
-    g_signal_connect(GTK_BUTTON(abutton), "clicked", G_CALLBACK(addition_cb),
-                     win);
-    gtk_box_append(box, abutton);
-  }
-
-  {
-    GtkWidget *mbutton = gtk_button_new_with_mnemonic("Insert _multiplication");
-    g_signal_connect(GTK_BUTTON(mbutton), "clicked",
-                     G_CALLBACK(multiplication_cb), win);
-    gtk_box_append(box, mbutton);
-  }
+  free (offers);
 
   AdwDialog *dialog = adw_dialog_new();
 
