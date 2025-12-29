@@ -151,11 +151,10 @@ fn traverse_dynamically(
                                 }
                             },
                             .remove_cursor_node => {
-                                if (node.remove_at(i)) {
-                                    // If we removed the last element, we select the one before.
-                                    if (node.get_nth_child(i) == null) {
-                                        i -= 1;
-                                    }
+                                switch (node.remove_at(i)) {
+                                    .done => |x| i = x.new_index,
+                                    .not_possible => {},
+                                    .replaced => break,
                                 }
                             },
                         }

@@ -113,7 +113,7 @@ const Expr = union(enum) {
         };
     }
 
-    fn remove_at(ptr: *anyopaque, i: usize) bool {
+    fn remove_at(ptr: *anyopaque, i: usize) Tree.RemovalOutcome {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
         return switch (self.*) {
@@ -127,14 +127,18 @@ const Expr = union(enum) {
                         const c = v.items[0];
                         v.clearAndFree(cator);
                         self.* = c;
+
+                        return .replaced;
                     }
 
-                    return true;
+                    const new_index = if (p.args.items.len == i) i - 1 else i;
+
+                    return .{ .done = .{ .new_index = new_index } };
                 } else {
-                    return false;
+                    @panic("Invalid remove_at call");
                 }
             },
-            else => return false,
+            else => return .not_possible,
         };
     }
 
@@ -151,6 +155,8 @@ const Expr = union(enum) {
     }
 
     fn rewrite_as_add(ptr: *anyopaque) Allocator.Error!void {
+        std.debug.print("hehe\n", .{});
+
         const p: *Self = @ptrCast(@alignCast(ptr));
 
         var args = try OpList.initCapacity(cator, 2);
@@ -237,8 +243,8 @@ const Id = union(enum) {
         return false;
     }
 
-    fn remove_at(_: *anyopaque, _: usize) bool {
-        return false;
+    fn remove_at(_: *anyopaque, _: usize) Tree.RemovalOutcome {
+        return .not_possible;
     }
 
     fn make_into_hole(ptr: *anyopaque) void {
@@ -346,8 +352,8 @@ const Com = union(enum) {
         return false;
     }
 
-    fn remove_at(_: *anyopaque, _: usize) bool {
-        return false;
+    fn remove_at(_: *anyopaque, _: usize) Tree.RemovalOutcome {
+        return .not_possible;
     }
 
     fn make_into_hole(ptr: *anyopaque) void {

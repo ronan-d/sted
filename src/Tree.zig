@@ -13,7 +13,7 @@ pub const VTable = struct {
 
     insert_at: *const fn (*anyopaque, i: usize) bool,
 
-    remove_at: *const fn (*anyopaque, i: usize) bool,
+    remove_at: *const fn (*anyopaque, i: usize) RemovalOutcome,
 
     make_into_hole: *const fn (*anyopaque) void,
 
@@ -36,7 +36,15 @@ pub fn insert_at(self: *Self, i: usize) bool {
     return self.vtable.insert_at(self.ptr, i);
 }
 
-pub fn remove_at(self: *Self, i: usize) bool {
+pub const RemovalOutcome = union(enum) {
+    done: struct { new_index: usize },
+    not_possible,
+    // "Replaced" means that the removal was performed and resulted in a
+    // single-element list that was replaced with the single element directly.
+    replaced,
+};
+
+pub fn remove_at(self: *Self, i: usize) RemovalOutcome {
     return self.vtable.remove_at(self.ptr, i);
 }
 
@@ -50,14 +58,14 @@ pub fn render(self: *Self, sink: *Sink) Allocator.Error!void {
     }
 }
 
-const Rewriter = union(enum) {
+pub const Rewriter = union(enum) {
     from_void: *const fn (*anyopaque) Allocator.Error!void,
     from_string: *const fn (*anyopaque, []const u8) Allocator.Error!void,
     from_int: *const fn (*anyopaque, u64) Allocator.Error!void,
 };
 
 pub const Offer = struct {
-    name: []const u8,
+    name: [:0]const u8,
     rewriter: Rewriter,
 };
 

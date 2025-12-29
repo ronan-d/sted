@@ -5,7 +5,7 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     const srcprg = b.createModule(.{
-        .root_source_file = b.path("srcprg.zig"),
+        .root_source_file = b.path("src/srcprg.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
@@ -13,34 +13,40 @@ pub fn build(b: *std.Build) void {
 
     srcprg.addIncludePath(b.path("."));
 
-    const lib = b.addLibrary(.{ .name = "srcprg", .root_module = srcprg });
+    const gobject = b.dependency("gobject", .{});
 
-    const exe = b.addExecutable(.{
+    const main = b.addExecutable(.{
         .name = "sted",
         .root_module = b.createModule(.{
+            // b.createModule defines a new module just like b.addModule but,
+            // unlike b.addModule, it does not expose the module to consumers of
+            // this package, which is why in this case we don't have to give it a name.
+            .root_source_file = b.path("src/main.zig"),
+            // Target and optimization levels must be explicitly wired in when
+            // defining an executable or library (in the root module), and you
+            // can also hardcode a specific target for an executable or library
+            // definition if desireable (e.g. firmware for embedded devices).
             .target = target,
             .optimize = optimize,
-            .link_libc = true,
+            .imports = &.{
+                .{ .name = "glib", .module = gobject.module("glib2") },
+                .{ .name = "gobject", .module = gobject.module("gobject2") },
+                .{ .name = "gio", .module = gobject.module("gio2") },
+                .{ .name = "cairo", .module = gobject.module("cairo1") },
+                .{ .name = "pango", .module = gobject.module("pango1") },
+                .{ .name = "pangocairo", .module = gobject.module("pangocairo1") },
+                .{ .name = "gdk", .module = gobject.module("gdk4") },
+                .{ .name = "gtk", .module = gobject.module("gtk4") },
+                .{ .name = "adw", .module = gobject.module("adw1") },
+                .{ .name = "gtksourceview", .module = gobject.module("gtksource5") },
+            },
         }),
     });
 
-    for ([_][]const u8{ "main.c", "stedapp.c", "stedwindow.c" }) |f| {
-        const cfile = std.Build.Module.CSourceFile{
-            .file = b.path(f),
-        };
-        exe.root_module.addCSourceFile(cfile);
-    }
-
-    exe.root_module.linkLibrary(lib);
-
-    exe.root_module.linkSystemLibrary("gtk4", .{});
-    exe.root_module.linkSystemLibrary("gtksourceview-5", .{});
-    exe.root_module.linkSystemLibrary("adwaita-1", .{});
-
-    b.installArtifact(exe);
+    b.installArtifact(main);
 
     const run_step = b.step("run", "run Sted");
-    const run_cmd = b.addRunArtifact(exe);
+    const run_cmd = b.addRunArtifact(main);
 
     run_step.dependOn(&run_cmd.step);
 }

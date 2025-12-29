@@ -1,0 +1,91 @@
+const std = @import("std");
+
+const cator = std.heap.c_allocator;
+
+const imp = @import("imp.zig");
+
+const Tree = @import("Tree.zig");
+
+const Sink = @import("render.zig").Sink;
+
+const Frame = @import("Frame.zig");
+
+pub const Srcprg = struct {
+    tree: Tree,
+    cursor: *ThreadCursor,
+    sink: Sink,
+
+    const Self = @This();
+
+    pub fn render(self: *Self) !Frame {
+        self.sink.buf.clearRetainingCapacity();
+
+        self.sink.cursor = self.cursor.cursor_pos.ptr;
+        try self.tree.render(&self.sink);
+
+        try self.sink.buf.append(cator, 0);
+
+        return Frame{
+            .text = self.sink.buf.items,
+            .start_offset = self.sink.cursor_start,
+            .end_offset = self.sink.cursor_end,
+        };
+    }
+
+    pub fn new() !Self {
+        const x = try imp.create_sample();
+        return Self{
+            .tree = x,
+            .cursor = blk: {
+                const p = cator.create(ThreadCursor) catch std.process.exit(1);
+                p.* = ThreadCursor.init(x);
+
+                p.start();
+
+                p.perform(.go_down);
+                p.perform(.go_right);
+                p.perform(.go_down);
+                p.perform(.go_right);
+
+                break :blk p;
+            },
+            .sink = Sink{
+                .buf = .{},
+                .cursor_start = undefined,
+                .cursor_end = undefined,
+                .cursor = x.ptr,
+            },
+        };
+    }
+};
+
+export fn create_srcprg() ?*anyopaque {
+    const x = imp.create_sample() catch return null;
+
+    const s = cator.create(Srcprg) catch return null;
+    s.tree = x;
+    s.cursor = blk: {
+        const p = cator.create(ThreadCursor) catch std.process.exit(1);
+        p.* = ThreadCursor.init(x);
+
+        p.start();
+
+        p.perform(.go_down);
+        p.perform(.go_right);
+        p.perform(.go_down);
+        p.perform(.go_right);
+
+        break :blk p;
+    };
+
+    s.sink = Sink{
+        .buf = .{},
+        .cursor_start = undefined,
+        .cursor_end = undefined,
+        .cursor = x.ptr,
+    };
+
+    return @ptrCast(s);
+}
+
+const ThreadCursor = @import("ThreadCursor.zig");
