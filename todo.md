@@ -1,4 +1,3 @@
 - Multiline programs.
-- Identifier input.
 - Complete Imp.
 - Check for memory leaks.

@@ -133,71 +133,45 @@ pub const StedWindow = extern struct {
         dialog.setPresentationMode(adw.DialogPresentationMode.floating);
 
         const offers = self.srcprg.cursor.cursor_pos.get_offers();
+
         for (offers) |offer| {
+            const button = gtk.Button.newWithMnemonic(offer.name);
+            box.append(button.as(gtk.Widget));
+
             switch (offer.rewriter) {
                 .from_void => |f| {
-                    const button = gtk.Button.newWithMnemonic(offer.name);
-
-                    const local_module = struct {
-                        pub const SignalData = struct {
-                            rewriter: *const fn (*anyopaque) Allocator.Error!void,
-                            // The opaque pointer that's inside the `Tree`.
-                            win: *StedWindow,
-                            dialog: *adw.Dialog,
-                        };
-
-                        pub fn destroy_data(p: *SignalData) callconv(.c) void {
-                            cator.destroy(p);
-                        }
-
-                        pub fn cb(_: *gtk.Button, signal_data: *SignalData) callconv(.c) void {
-                            const ptr = signal_data.win.srcprg.cursor.cursor_pos.ptr;
-                            signal_data.rewriter(ptr) catch unreachable;
-
-                            signal_data.win.refresh() catch unreachable;
-
-                            {
-                                const res = signal_data.dialog.close();
-                                if (res != 1) {
-                                    @panic("Failed to close dialog");
-                                }
-                            }
-                        }
-                    };
-
-                    const signal_data = try cator.create(local_module.SignalData);
-
-                    signal_data.* = .{
-                        .rewriter = f,
-                        .win = self,
-                        .dialog = dialog,
-                    };
-
-                    _ = gtk.Button.signals.clicked.connect(
-                        button,
-                        *local_module.SignalData,
-                        local_module.cb,
-                        signal_data,
-                        .{ .destroyData = local_module.destroy_data },
-                    );
-
-                    box.append(button.as(gtk.Widget));
-                },
-                .from_int => |f| {
-                    const button = gtk.Button.newWithMnemonic(offer.name);
-
-                    box.append(button.as(gtk.Widget));
-
                     _ = gtk.Button.signals.clicked.connect(
                         button,
                         *anyopaque,
-                        button_cb_int,
+                        button_cb_void,
                         @ptrCast(@constCast(f)),
                         .{},
                     );
                 },
-                // WIP partial support for now
-                else => {},
+                .from_int => |f| {
+                    const button_cb = button_cb_generic(u64, int_from_string);
+
+                    _ = gtk.Button.signals.clicked.connect(
+                        button,
+                        *anyopaque,
+                        button_cb,
+                        // Note: it would be nice to be more type-safe here.
+                        @ptrCast(@constCast(f)),
+                        .{},
+                    );
+                },
+                .from_string => |f| {
+                    const button_cb = button_cb_generic([]const u8, string_from_string);
+
+                    _ = gtk.Button.signals.clicked.connect(
+                        button,
+                        *anyopaque,
+                        button_cb,
+                        // Note: it would be nice to be more type-safe here.
+                        @ptrCast(@constCast(f)),
+                        .{},
+                    );
+                },
             }
         }
 
@@ -250,53 +224,98 @@ pub const StedWindow = extern struct {
     }
 };
 
-fn button_cb_int(
-    button: *gtk.Button,
-    user_data: *anyopaque,
-) callconv(.c) void {
-    const entry = gtk.Entry.new();
+fn button_cb_generic(
+    param_type: type,
+    from_string: fn ([*:0]const u8) param_type,
+) fn (button: *gtk.Button, user_data: *anyopaque) callconv(.c) void {
+    const local_module = struct {
+        fn button_cb(button: *gtk.Button, user_data: *anyopaque) callconv(.c) void {
+            const entry = gtk.Entry.new();
 
-    _ = gtk.Entry.signals.activate.connect(
-        entry,
-        *anyopaque,
-        entry_cb_int,
-        user_data,
-        .{},
-    );
+            const entry_cb = entry_cb_generic(param_type, from_string);
 
-    const dialog_widget = button.as(gtk.Widget).getAncestor(adw.Dialog.getGObjectType()).?;
-    const dialog = gobject.ext.cast(adw.Dialog, dialog_widget).?;
+            _ = gtk.Entry.signals.activate.connect(
+                entry,
+                *anyopaque,
+                entry_cb,
+                user_data,
+                .{},
+            );
 
-    dialog.setChild(entry.as(gtk.Widget));
-    _ = entry.as(gtk.Widget).grabFocus();
+            const dialog_widget = button.as(gtk.Widget).getAncestor(adw.Dialog.getGObjectType()).?;
+            const dialog = gobject.ext.cast(adw.Dialog, dialog_widget).?;
+
+            dialog.setChild(entry.as(gtk.Widget));
+            _ = entry.as(gtk.Widget).grabFocus();
+        }
+    };
+
+    return local_module.button_cb;
 }
 
-fn entry_cb_int(
-    entry: *gtk.Entry,
-    user_data: *anyopaque,
-) callconv(.c) void {
-    const f: *const fn (*anyopaque, u64) Allocator.Error!void = @ptrCast(user_data);
-    const text = entry.getBuffer().getText();
+fn entry_cb_generic(
+    param_type: type,
+    from_string: fn ([*:0]const u8) param_type,
+) fn (entry: *gtk.Entry, user_data: *anyopaque) callconv(.c) void {
+    const local_module = struct {
+        fn entry_cb(entry: *gtk.Entry, user_data: *anyopaque) callconv(.c) void {
+            const f: *const fn (*anyopaque, param_type) Allocator.Error!void = @ptrCast(user_data);
+            const text = entry.getBuffer().getText();
 
+            const text_slice = std.mem.sliceTo(text, 0);
+
+            const arg = from_string(text_slice);
+
+            const dialog_widget = entry.as(gtk.Widget).getAncestor(adw.Dialog.getGObjectType()).?;
+            const dialog = gobject.ext.cast(adw.Dialog, dialog_widget).?;
+
+            const win_widget = dialog_widget.getAncestor(StedWindow.getGObjectType()).?;
+            const win = gobject.ext.cast(StedWindow, win_widget).?;
+
+            const ptr = win.srcprg.cursor.cursor_pos.ptr;
+            f(ptr, arg) catch unreachable;
+
+            win.refresh() catch unreachable;
+
+            close_dialog(dialog);
+        }
+    };
+
+    return local_module.entry_cb;
+}
+
+fn int_from_string(text: [*:0]const u8) u64 {
     const text_slice = std.mem.sliceTo(text, 0);
 
     const num = std.fmt.parseInt(u64, text_slice, 10) catch unreachable;
 
-    const dialog_widget = entry.as(gtk.Widget).getAncestor(adw.Dialog.getGObjectType()).?;
+    return num;
+}
+
+fn string_from_string(text: [*:0]const u8) []const u8 {
+    return std.mem.sliceTo(text, 0);
+}
+
+fn button_cb_void(button: *gtk.Button, user_data: *anyopaque) callconv(.c) void {
+    const f: *const fn (*anyopaque) Allocator.Error!void = @ptrCast(user_data);
+
+    const dialog_widget = button.as(gtk.Widget).getAncestor(adw.Dialog.getGObjectType()).?;
     const dialog = gobject.ext.cast(adw.Dialog, dialog_widget).?;
 
     const win_widget = dialog_widget.getAncestor(StedWindow.getGObjectType()).?;
     const win = gobject.ext.cast(StedWindow, win_widget).?;
 
     const ptr = win.srcprg.cursor.cursor_pos.ptr;
-    f(ptr, num) catch unreachable;
+    f(ptr) catch unreachable;
 
     win.refresh() catch unreachable;
 
-    {
-        const res = dialog.close();
-        if (res != 1) {
-            @panic("Failed to close dialog");
-        }
+    close_dialog(dialog);
+}
+
+fn close_dialog(d: *adw.Dialog) void {
+    const res = d.close();
+    if (res != 1) {
+        @panic("Failed to close dialog");
     }
 }
