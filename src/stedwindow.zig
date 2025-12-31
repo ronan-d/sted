@@ -127,10 +127,12 @@ pub const StedWindow = extern struct {
     fn create_input_dialog(self: *Self) !*adw.Dialog {
         const box = gtk.Box.new(gtk.Orientation.vertical, 0);
 
-        const offers = self.srcprg.cursor.cursor_pos.get_offers();
-
         const dialog = adw.Dialog.new();
+        dialog.setChild(box.as(gtk.Widget));
+        dialog.setFollowsContentSize(1);
+        dialog.setPresentationMode(adw.DialogPresentationMode.floating);
 
+        const offers = self.srcprg.cursor.cursor_pos.get_offers();
         for (offers) |offer| {
             switch (offer.rewriter) {
                 .from_void => |f| {
@@ -181,14 +183,23 @@ pub const StedWindow = extern struct {
 
                     box.append(button.as(gtk.Widget));
                 },
+                .from_int => |f| {
+                    const button = gtk.Button.newWithMnemonic(offer.name);
+
+                    box.append(button.as(gtk.Widget));
+
+                    _ = gtk.Button.signals.clicked.connect(
+                        button,
+                        *anyopaque,
+                        button_cb_int,
+                        @ptrCast(@constCast(f)),
+                        .{},
+                    );
+                },
                 // WIP partial support for now
                 else => {},
             }
         }
-
-        dialog.setChild(box.as(gtk.Widget));
-        dialog.setFollowsContentSize(1);
-        dialog.setPresentationMode(adw.DialogPresentationMode.floating);
 
         return dialog;
     }
@@ -238,3 +249,54 @@ pub const StedWindow = extern struct {
         self.renderer.render_frame(try self.srcprg.render());
     }
 };
+
+fn button_cb_int(
+    button: *gtk.Button,
+    user_data: *anyopaque,
+) callconv(.c) void {
+    const entry = gtk.Entry.new();
+
+    _ = gtk.Entry.signals.activate.connect(
+        entry,
+        *anyopaque,
+        entry_cb_int,
+        user_data,
+        .{},
+    );
+
+    const dialog_widget = button.as(gtk.Widget).getAncestor(adw.Dialog.getGObjectType()).?;
+    const dialog = gobject.ext.cast(adw.Dialog, dialog_widget).?;
+
+    dialog.setChild(entry.as(gtk.Widget));
+    _ = entry.as(gtk.Widget).grabFocus();
+}
+
+fn entry_cb_int(
+    entry: *gtk.Entry,
+    user_data: *anyopaque,
+) callconv(.c) void {
+    const f: *const fn (*anyopaque, u64) Allocator.Error!void = @ptrCast(user_data);
+    const text = entry.getBuffer().getText();
+
+    const text_slice = std.mem.sliceTo(text, 0);
+
+    const num = std.fmt.parseInt(u64, text_slice, 10) catch unreachable;
+
+    const dialog_widget = entry.as(gtk.Widget).getAncestor(adw.Dialog.getGObjectType()).?;
+    const dialog = gobject.ext.cast(adw.Dialog, dialog_widget).?;
+
+    const win_widget = dialog_widget.getAncestor(StedWindow.getGObjectType()).?;
+    const win = gobject.ext.cast(StedWindow, win_widget).?;
+
+    const ptr = win.srcprg.cursor.cursor_pos.ptr;
+    f(ptr, num) catch unreachable;
+
+    win.refresh() catch unreachable;
+
+    {
+        const res = dialog.close();
+        if (res != 1) {
+            @panic("Failed to close dialog");
+        }
+    }
+}

@@ -1,4 +1,4 @@
 - Multiline programs.
-- Numeric constants.
+- Identifier input.
 - Complete Imp.
 - Check for memory leaks.

@@ -155,8 +155,6 @@ const Expr = union(enum) {
     }
 
     fn rewrite_as_add(ptr: *anyopaque) Allocator.Error!void {
-        std.debug.print("hehe\n", .{});
-
         const p: *Self = @ptrCast(@alignCast(ptr));
 
         var args = try OpList.initCapacity(cator, 2);
