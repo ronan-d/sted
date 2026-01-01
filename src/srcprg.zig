@@ -18,7 +18,7 @@ pub const Srcprg = struct {
     const Self = @This();
 
     pub fn render(self: *Self) !Frame {
-        self.sink.buf.clearRetainingCapacity();
+        self.sink.clear();
 
         self.sink.cursor = self.cursor.cursor_pos.ptr;
         try self.tree.render(&self.sink);
@@ -43,6 +43,7 @@ pub const Srcprg = struct {
                 p.start();
 
                 p.perform(.go_down);
+                p.perform(.go_down);
                 p.perform(.go_right);
                 p.perform(.go_down);
                 p.perform(.go_right);
@@ -54,38 +55,10 @@ pub const Srcprg = struct {
                 .cursor_start = undefined,
                 .cursor_end = undefined,
                 .cursor = x.ptr,
+                .code_point_counter = 0,
             },
         };
     }
 };
-
-export fn create_srcprg() ?*anyopaque {
-    const x = imp.create_sample() catch return null;
-
-    const s = cator.create(Srcprg) catch return null;
-    s.tree = x;
-    s.cursor = blk: {
-        const p = cator.create(ThreadCursor) catch std.process.exit(1);
-        p.* = ThreadCursor.init(x);
-
-        p.start();
-
-        p.perform(.go_down);
-        p.perform(.go_right);
-        p.perform(.go_down);
-        p.perform(.go_right);
-
-        break :blk p;
-    };
-
-    s.sink = Sink{
-        .buf = .{},
-        .cursor_start = undefined,
-        .cursor_end = undefined,
-        .cursor = x.ptr,
-    };
-
-    return @ptrCast(s);
-}
 
 const ThreadCursor = @import("ThreadCursor.zig");

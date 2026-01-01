@@ -43,34 +43,38 @@ const Expr = union(enum) {
         sink.start_node(self);
 
         switch (self.*) {
-            .e_const => |n| try sink.buf.print(cator, "{}", .{n}),
+            .e_const => |n| {
+                const len_before = sink.buf.items.len;
+                try sink.buf.print(cator, "{}", .{n});
+                sink.code_point_counter += sink.buf.items.len - len_before;
+            },
             .e_assop => |op| {
                 const needs_paren = op.o.le(parent_op);
 
                 if (needs_paren) {
-                    try sink.buf.append(cator, '(');
+                    try sink.append_ascii("(");
                 }
 
                 if (op.args.items.len > 0) {
                     try op.args.items[0].render(sink, op.o);
 
                     for (op.args.items[1..]) |*arg| {
-                        try sink.buf.append(cator, ' ');
-                        try sink.buf.append(cator, switch (op.o) {
-                            .add => '+',
-                            .mul => '*',
+                        try sink.append_ascii(" ");
+                        try sink.append_ascii(switch (op.o) {
+                            .add => "+",
+                            .mul => "*",
                         });
-                        try sink.buf.append(cator, ' ');
+                        try sink.append_ascii(" ");
                         try arg.render(sink, op.o);
                     }
                 }
 
                 if (needs_paren) {
-                    try sink.buf.append(cator, ')');
+                    try sink.append_ascii(")");
                 }
             },
             .e_hole => {
-                try sink.buf.appendSlice(cator, "◆");
+                try sink.append("◆", 1);
             },
         }
 
@@ -219,10 +223,10 @@ const Id = union(enum) {
 
         switch (self.*) {
             .id => |s| {
-                try sink.buf.appendSlice(cator, s);
+                try sink.append_ascii(s);
             },
             .hole => {
-                try sink.buf.appendSlice(cator, "◆");
+                try sink.append("◆", 1);
             },
         }
 
@@ -294,23 +298,20 @@ const Com = union(enum) {
         }
     }
 
-    pub fn render(
-        self: *Self,
-        sink: *Sink,
-    ) !void {
+    pub fn render(self: *Self, sink: *Sink) !void {
         sink.start_node(self);
 
         switch (self.*) {
             .skip => {
-                try sink.buf.appendSlice(cator, "skip");
+                try sink.append_ascii("skip");
             },
             .asgn => |asgn| {
                 try asgn.x.render(sink);
-                try sink.buf.appendSlice(cator, " := ");
+                try sink.append_ascii(" := ");
                 try asgn.a.render(sink, AssOp.add);
             },
             .hole => {
-                try sink.buf.appendSlice(cator, "◆");
+                try sink.append("◆", 1);
             },
         }
 
@@ -370,6 +371,7 @@ const Com = union(enum) {
     fn rewrite_as_skip(ptr: *anyopaque) Allocator.Error!void {
         const p: *Self = @ptrCast(@alignCast(ptr));
 
+        p.free_children();
         p.* = .skip;
     }
 
@@ -382,6 +384,7 @@ const Com = union(enum) {
         px.* = .hole;
         pa.* = .e_hole;
 
+        p.free_children();
         p.* = .{ .asgn = .{ .x = px, .a = pa } };
     }
 
@@ -439,8 +442,116 @@ pub fn create_sample() Allocator.Error!Tree {
     const i = try cator.create(Id);
     i.* = .{ .id = "foo" };
 
-    const c = try cator.create(Com);
-    c.* = .{ .asgn = .{ .x = i, .a = ep } };
+    const ibar = try cator.create(Id);
+    ibar.* = .{ .id = "bar" };
 
-    return c.to_tree();
+    const ebar = try cator.create(Expr);
+    ebar.* = Expr{ .e_const = 10 };
+
+    const seq = try cator.create(ComSeq);
+    seq.* = blk: {
+        var coms = try std.ArrayList(Com).initCapacity(cator, 2);
+        coms.appendAssumeCapacity(.{ .asgn = .{ .x = i, .a = ep } });
+        coms.appendAssumeCapacity(.{ .asgn = .{ .x = ibar, .a = ebar } });
+
+        break :blk ComSeq{ .coms = coms };
+    };
+
+    return seq.to_tree();
 }
+
+const ComSeq = struct {
+    coms: std.ArrayList(Com),
+
+    const Self = @This();
+
+    fn free_children(self: *Self) void {
+        self.coms.deinit(cator);
+    }
+
+    pub fn render(self: *Self, sink: *Sink) !void {
+        sink.start_node(self);
+
+        if (0 < self.coms.items.len) {
+            var i: usize = 0;
+            while (true) {
+                try self.coms.items[i].render(sink);
+                i += 1;
+                if (i == self.coms.items.len) {
+                    break;
+                }
+
+                try sink.append_ascii(";\n");
+            }
+        }
+
+        sink.end_node(self);
+    }
+
+    fn child_count(ptr: *anyopaque) usize {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        return self.coms.items.len;
+    }
+
+    fn get_nth_child(ptr: *anyopaque, n: usize) ?Tree {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        return if (n < self.coms.items.len) self.coms.items[n].to_tree() else null;
+    }
+
+    fn insert_at(ptr: *anyopaque, i: usize) bool {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        if (i <= self.coms.items.len) {
+            self.coms.insert(cator, i, Com.hole) catch unreachable;
+            return true;
+        }
+
+        return false;
+    }
+
+    fn remove_at(ptr: *anyopaque, i: usize) Tree.RemovalOutcome {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        if (i < self.coms.items.len) {
+            var x = self.coms.orderedRemove(i);
+            x.free_children();
+
+            const new_index = if (i == self.coms.items.len) i - 1 else i;
+            return .{ .done = .{ .new_index = new_index } };
+        }
+
+        @panic("Invalid remove_at call");
+    }
+
+    fn make_into_hole(ptr: *anyopaque) void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        // TODO Maybe demote that method, it seems really inappropriate for
+        // ComSeq.
+        _ = self;
+    }
+
+    fn raw_render(ptr: *anyopaque, sink: *Sink) Allocator.Error!void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        return self.render(sink);
+    }
+
+    const replacement_offers = &[_]Offer{};
+
+    pub const vt = VTable{
+        .child_count = child_count,
+        .get_nth_child = get_nth_child,
+        .insert_at = insert_at,
+        .remove_at = remove_at,
+        .make_into_hole = make_into_hole,
+        .render = raw_render,
+        .replacement_offers = replacement_offers,
+    };
+
+    pub fn to_tree(self: *Self) Tree {
+        return .{ .ptr = self, .vtable = &vt };
+    }
+};

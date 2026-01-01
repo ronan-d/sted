@@ -30,22 +30,11 @@ const Renderer = extern struct {
 
         self.buffer.setText(with_sentinel, @intCast(with_sentinel.len));
 
-        // TODO: handle more than one line of code.
         var start: gtk.TextIter = undefined;
-        {
-            const res = self.buffer.getIterAtLineIndex(&start, 0, @intCast(frame.start_offset));
-            if (res != 1) {
-                @panic("unexpected string index error");
-            }
-        }
+        self.buffer.getIterAtOffset(&start, @intCast(frame.start_offset));
 
         var end: gtk.TextIter = undefined;
-        {
-            const res = self.buffer.getIterAtLineIndex(&end, 0, @intCast(frame.end_offset));
-            if (res != 1) {
-                @panic("unexpected string index error");
-            }
-        }
+        self.buffer.getIterAtOffset(&end, @intCast(frame.end_offset));
 
         self.buffer.applyTag(self.tag, &start, &end);
     }
