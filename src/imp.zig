@@ -102,7 +102,7 @@ const Expr = union(enum) {
 
         return switch (self.*) {
             .e_assop => |*p| {
-                if (i < p.args.items.len) {
+                if (i <= p.args.items.len) {
                     p.args.insert(cator, i, .e_hole) catch std.process.exit(1);
                     return true;
                 } else {
