@@ -38,7 +38,7 @@ const Expr = union(enum) {
     pub fn render(
         self: *Self,
         sink: *Sink,
-        parent_op: AssOp,
+        parent_op: ?AssOp,
     ) !void {
         sink.start_node(self);
 
@@ -49,7 +49,7 @@ const Expr = union(enum) {
                 sink.code_point_counter += sink.buf.items.len - len_before;
             },
             .e_assop => |op| {
-                const needs_paren = op.o.le(parent_op);
+                const needs_paren = if (parent_op) |po| op.o.le(po) else false;
 
                 if (needs_paren) {
                     try sink.append_ascii("(");
@@ -308,7 +308,7 @@ const Com = union(enum) {
             .asgn => |asgn| {
                 try asgn.x.render(sink);
                 try sink.append_ascii(" := ");
-                try asgn.a.render(sink, AssOp.add);
+                try asgn.a.render(sink, null);
             },
             .hole => {
                 try sink.append("◆", 1);
