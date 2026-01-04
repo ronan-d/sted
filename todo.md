@@ -1,4 +1,3 @@
-- Complete Imp.
-  - While loops.
 - Check for memory leaks.
 - Improve cursor display for single-statement list.
+- Fix display of empty command lists.

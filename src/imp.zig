@@ -39,10 +39,11 @@ const Expr = union(enum) {
 
     pub fn drop(node: *Self) void {
         switch (node.*) {
+            .e_const => {},
             .e_assop => |*op| {
                 op.drop();
             },
-            else => {},
+            .e_hole => {},
         }
     }
 
@@ -259,14 +260,29 @@ const Com = union(enum) {
     skip,
     asgn: struct { x: *Id, a: *Expr },
     conditional: struct { cond: *BExpr, then_branch: ComSeq, else_branch: ComSeq },
+    while_loop: struct { cond: *BExpr, commands: ComSeq },
     hole,
 
     const Self = @This();
 
-    pub fn free_children(self: *Self) void {
+    pub fn drop(self: *Self) void {
         switch (self.*) {
+            .skip => {},
             .asgn => |p| p.a.drop(),
-            else => {},
+            .conditional => |*x| {
+                x.cond.drop();
+                cator.destroy(x.cond);
+
+                x.then_branch.drop();
+                x.else_branch.drop();
+            },
+            .while_loop => |*x| {
+                x.cond.drop();
+                cator.destroy(x.cond);
+
+                x.commands.drop();
+            },
+            .hole => {},
         }
     }
 
@@ -296,6 +312,15 @@ const Com = union(enum) {
 
                 try x.else_branch.render(sink);
             },
+            .while_loop => |*x| {
+                try sink.append_ascii("while ");
+
+                try x.cond.render(sink, null);
+
+                try sink.append_ascii(" do ");
+
+                try x.commands.render(sink);
+            },
             .hole => {
                 try sink.append("◆", 1);
             },
@@ -305,7 +330,7 @@ const Com = union(enum) {
     }
 
     pub fn overwrite(p: *Com, c: Com) void {
-        p.free_children();
+        p.drop();
         p.* = c;
     }
 
@@ -316,6 +341,7 @@ const Com = union(enum) {
             .skip => 0,
             .asgn => 2,
             .conditional => 3,
+            .while_loop => 2,
             .hole => 0,
         };
     }
@@ -336,6 +362,11 @@ const Com = union(enum) {
                 2 => x.else_branch.to_tree(),
                 else => null,
             },
+            .while_loop => |*x| switch (n) {
+                0 => x.cond.to_tree(),
+                1 => x.commands.to_tree(),
+                else => null,
+            },
             .hole => null,
         };
     }
@@ -351,7 +382,7 @@ const Com = union(enum) {
     fn make_into_hole(ptr: *anyopaque) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
-        self.free_children();
+        self.drop();
         self.* = .hole;
     }
 
@@ -362,14 +393,15 @@ const Com = union(enum) {
     }
 
     fn rewrite_as_skip(ptr: *anyopaque) Allocator.Error!void {
-        const p: *Self = @ptrCast(@alignCast(ptr));
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
 
-        p.free_children();
-        p.* = .skip;
+        self.* = .skip;
     }
 
     fn rewrite_as_asgn(ptr: *anyopaque) Allocator.Error!void {
-        const p: *Self = @ptrCast(@alignCast(ptr));
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
 
         const px = try cator.create(Id);
         const pa = try cator.create(Expr);
@@ -377,8 +409,39 @@ const Com = union(enum) {
         px.* = .hole;
         pa.* = .e_hole;
 
-        p.free_children();
-        p.* = .{ .asgn = .{ .x = px, .a = pa } };
+        self.drop();
+        self.* = .{ .asgn = .{ .x = px, .a = pa } };
+    }
+
+    fn rewrite_as_if(ptr: *anyopaque) Allocator.Error!void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
+
+        const cond = try cator.create(BExpr);
+        cond.* = .hole;
+
+        self.* = .{
+            .conditional = .{
+                .cond = cond,
+                .then_branch = .{ .coms = std.ArrayList(Com).empty },
+                .else_branch = .{ .coms = std.ArrayList(Com).empty },
+            },
+        };
+    }
+
+    fn rewrite_as_while(ptr: *anyopaque) Allocator.Error!void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
+
+        const cond = try cator.create(BExpr);
+        cond.* = .hole;
+
+        self.* = .{
+            .while_loop = .{
+                .cond = cond,
+                .commands = .{ .coms = std.ArrayList(Com).empty },
+            },
+        };
     }
 
     const replacement_offers = &[_]Offer{
@@ -389,6 +452,14 @@ const Com = union(enum) {
         Offer{
             .name = "assignment",
             .rewriter = .{ .from_void = rewrite_as_asgn },
+        },
+        Offer{
+            .name = "if",
+            .rewriter = .{ .from_void = rewrite_as_if },
+        },
+        Offer{
+            .name = "while",
+            .rewriter = .{ .from_void = rewrite_as_while },
         },
     };
 
@@ -480,7 +551,11 @@ const ComSeq = struct {
 
     const Self = @This();
 
-    fn free_children(self: *Self) void {
+    fn drop(self: *Self) void {
+        for (self.coms.items) |*com| {
+            com.drop();
+        }
+
         self.coms.deinit(cator);
     }
 
@@ -531,7 +606,7 @@ const ComSeq = struct {
 
         if (i < self.coms.items.len) {
             var x = self.coms.orderedRemove(i);
-            x.free_children();
+            x.drop();
 
             const new_index = if (i == self.coms.items.len) i - 1 else i;
             return .{ .done = .{ .new_index = new_index } };

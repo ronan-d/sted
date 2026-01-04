@@ -21,7 +21,7 @@ pub fn Operation(
                 drop_operand(operand);
             }
 
-            self.operands.clearAndFree(cator);
+            self.operands.deinit(cator);
         }
 
         pub fn render(self: Self, sink: *Sink, parent_operator: ?OperatorType) Error!void {
@@ -94,7 +94,7 @@ pub fn Operation(
 
             if (self.operands.items.len == 1) {
                 const last_operand = self.operands.items[0];
-                self.operands.clearAndFree(cator);
+                self.operands.deinit(cator);
 
                 return RemovalOutcome{ .replaced = last_operand };
             }
