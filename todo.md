@@ -1,2 +1,4 @@
 - Complete Imp.
+  - While loops.
 - Check for memory leaks.
+- Improve cursor display for single-statement list.

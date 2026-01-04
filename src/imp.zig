@@ -6,39 +6,50 @@ const Offer = Tree.Offer;
 
 const Sink = @import("render.zig").Sink;
 
-// Associative operation. We store a list of operands, and not a binary tree.
-const AssOp = enum {
-    add,
-    mul,
-
-    fn le(a: @This(), b: @This()) bool {
-        return @intFromEnum(a) <= @intFromEnum(b);
-    }
-};
+const assoc = @import("assoc.zig");
 
 const Expr = union(enum) {
     e_const: u64,
-    e_assop: struct { o: AssOp, args: OpList },
+    e_assop: assoc.Operation(OperandType, OperatorType),
     e_hole,
+
+    pub const OperatorType = enum {
+        add,
+        mul,
+
+        pub fn is_not_greater_than(a: @This(), b: @This()) bool {
+            return @intFromEnum(a) <= @intFromEnum(b);
+        }
+
+        pub fn render(self: @This(), sink: *Sink) !void {
+            try sink.append_ascii(switch (self) {
+                .add => "+",
+                .mul => "*",
+            });
+        }
+    };
+
+    const OperandType = Self;
+
+    fn hole() Self {
+        return .e_hole;
+    }
 
     const Self = @This();
 
-    fn free_children(node: *Self) void {
+    pub fn drop(node: *Self) void {
         switch (node.*) {
             .e_assop => |*op| {
-                for (op.args.items) |*arg| {
-                    free_children(arg);
-                }
-                op.args.clearAndFree(cator);
+                op.drop();
             },
             else => {},
         }
     }
 
     pub fn render(
-        self: *Self,
+        self: *const Self,
         sink: *Sink,
-        parent_op: ?AssOp,
+        parent_op: ?OperatorType,
     ) !void {
         sink.start_node(self);
 
@@ -49,29 +60,7 @@ const Expr = union(enum) {
                 sink.code_point_counter += sink.buf.items.len - len_before;
             },
             .e_assop => |op| {
-                const needs_paren = if (parent_op) |po| op.o.le(po) else false;
-
-                if (needs_paren) {
-                    try sink.append_ascii("(");
-                }
-
-                if (op.args.items.len > 0) {
-                    try op.args.items[0].render(sink, op.o);
-
-                    for (op.args.items[1..]) |*arg| {
-                        try sink.append_ascii(" ");
-                        try sink.append_ascii(switch (op.o) {
-                            .add => "+",
-                            .mul => "*",
-                        });
-                        try sink.append_ascii(" ");
-                        try arg.render(sink, op.o);
-                    }
-                }
-
-                if (needs_paren) {
-                    try sink.append_ascii(")");
-                }
+                try op.render(sink, parent_op);
             },
             .e_hole => {
                 try sink.append("◆", 1);
@@ -86,7 +75,7 @@ const Expr = union(enum) {
 
         return switch (self.*) {
             .e_const => 0,
-            .e_assop => |op| op.args.items.len,
+            .e_assop => |op| op.operands.items.len,
             .e_hole => 0,
         };
     }
@@ -96,7 +85,7 @@ const Expr = union(enum) {
 
         return switch (self.*) {
             .e_const => null,
-            .e_assop => |op| if (n < op.args.items.len) op.args.items[n].to_tree() else null,
+            .e_assop => |op| if (op.get_nth_child(n)) |x| x.to_tree() else null,
             .e_hole => null,
         };
     }
@@ -106,12 +95,7 @@ const Expr = union(enum) {
 
         return switch (self.*) {
             .e_assop => |*p| {
-                if (i <= p.args.items.len) {
-                    p.args.insert(cator, i, .e_hole) catch std.process.exit(1);
-                    return true;
-                } else {
-                    return false;
-                }
+                return p.insert_at(i, .e_hole) catch unreachable;
             },
             else => return false,
         };
@@ -122,24 +106,16 @@ const Expr = union(enum) {
 
         return switch (self.*) {
             .e_assop => |*p| {
-                if (i < p.args.items.len) {
-                    var x = p.args.orderedRemove(i);
-                    x.free_children();
+                switch (p.remove_at(i)) {
+                    .normal => {
+                        const new_index = if (p.operands.items.len == i) i - 1 else i;
 
-                    if (p.args.items.len == 1) {
-                        var v = p.args;
-                        const c = v.items[0];
-                        v.clearAndFree(cator);
-                        self.* = c;
-
+                        return .{ .done = .{ .new_index = new_index } };
+                    },
+                    .replaced => |x| {
+                        self.* = x;
                         return .replaced;
-                    }
-
-                    const new_index = if (p.args.items.len == i) i - 1 else i;
-
-                    return .{ .done = .{ .new_index = new_index } };
-                } else {
-                    @panic("Invalid remove_at call");
+                    },
                 }
             },
             else => return .not_possible,
@@ -149,35 +125,33 @@ const Expr = union(enum) {
     fn make_into_hole(ptr: *anyopaque) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
-        self.free_children();
+        self.drop();
         self.* = .e_hole;
     }
 
     fn rewrite_as_const(ptr: *anyopaque, n: u64) Allocator.Error!void {
-        const p: *Self = @ptrCast(@alignCast(ptr));
-        p.* = Self{ .e_const = n };
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
+
+        self.* = Self{ .e_const = n };
     }
 
     fn rewrite_as_add(ptr: *anyopaque) Allocator.Error!void {
-        const p: *Self = @ptrCast(@alignCast(ptr));
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
 
-        var args = try OpList.initCapacity(cator, 2);
-
-        args.appendAssumeCapacity(.e_hole);
-        args.appendAssumeCapacity(.e_hole);
-
-        p.* = Expr{ .e_assop = .{ .o = .add, .args = args } };
+        self.* = Self{
+            .e_assop = try assoc.Operation(OperandType, OperatorType).make_initial_value(.add, .e_hole),
+        };
     }
 
     fn rewrite_as_mul(ptr: *anyopaque) Allocator.Error!void {
-        const p: *Self = @ptrCast(@alignCast(ptr));
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
 
-        var args = try OpList.initCapacity(cator, 2);
-
-        args.appendAssumeCapacity(.e_hole);
-        args.appendAssumeCapacity(.e_hole);
-
-        p.* = Expr{ .e_assop = .{ .o = .mul, .args = args } };
+        self.* = Self{
+            .e_assop = try assoc.Operation(OperandType, OperatorType).make_initial_value(.add, .e_hole),
+        };
     }
 
     const replacement_offers = &[_]Offer{
@@ -215,10 +189,7 @@ const Id = union(enum) {
 
     const Self = @This();
 
-    pub fn render(
-        self: *Self,
-        sink: *Sink,
-    ) !void {
+    pub fn render(self: *Self, sink: *Sink) !void {
         sink.start_node(self);
 
         switch (self.*) {
@@ -287,18 +258,19 @@ const Buffer = std.ArrayList(u8);
 const Com = union(enum) {
     skip,
     asgn: struct { x: *Id, a: *Expr },
+    conditional: struct { cond: *BExpr, then_branch: ComSeq, else_branch: ComSeq },
     hole,
 
     const Self = @This();
 
     pub fn free_children(self: *Self) void {
         switch (self.*) {
-            .asgn => |p| p.a.free_children(),
+            .asgn => |p| p.a.drop(),
             else => {},
         }
     }
 
-    pub fn render(self: *Self, sink: *Sink) !void {
+    pub fn render(self: *const Self, sink: *Sink) Allocator.Error!void {
         sink.start_node(self);
 
         switch (self.*) {
@@ -309,6 +281,20 @@ const Com = union(enum) {
                 try asgn.x.render(sink);
                 try sink.append_ascii(" := ");
                 try asgn.a.render(sink, null);
+            },
+            .conditional => |*x| {
+                try sink.append_ascii("if ");
+
+                try x.cond.render(sink, null);
+
+                // TODO line breaks and indentation.
+                try sink.append_ascii(" then ");
+
+                try x.then_branch.render(sink);
+
+                try sink.append_ascii(" else ");
+
+                try x.else_branch.render(sink);
             },
             .hole => {
                 try sink.append("◆", 1);
@@ -329,6 +315,7 @@ const Com = union(enum) {
         return switch (self.*) {
             .skip => 0,
             .asgn => 2,
+            .conditional => 3,
             .hole => 0,
         };
     }
@@ -341,6 +328,12 @@ const Com = union(enum) {
             .asgn => |s| switch (n) {
                 0 => s.x.to_tree(),
                 1 => s.a.to_tree(),
+                else => null,
+            },
+            .conditional => |*x| switch (n) {
+                0 => x.cond.to_tree(),
+                1 => x.then_branch.to_tree(),
+                2 => x.else_branch.to_tree(),
                 else => null,
             },
             .hole => null,
@@ -427,7 +420,7 @@ pub fn create_sample() Allocator.Error!Tree {
         var args = try OpList.initCapacity(cator, 2);
         args.appendAssumeCapacity(Expr{ .e_const = 2 });
         args.appendAssumeCapacity(Expr{ .e_const = 3 });
-        break :blk Expr{ .e_assop = .{ .o = AssOp.mul, .args = args } };
+        break :blk Expr{ .e_assop = .{ .operator = .mul, .operands = args } };
     };
 
     const ep = try cator.create(Expr);
@@ -436,7 +429,7 @@ pub fn create_sample() Allocator.Error!Tree {
         args.appendAssumeCapacity(Expr{ .e_const = 1 });
         args.appendAssumeCapacity(et);
         args.appendAssumeCapacity(Expr{ .e_const = 4 });
-        break :blk Expr{ .e_assop = .{ .o = .add, .args = args } };
+        break :blk Expr{ .e_assop = .{ .operator = .add, .operands = args } };
     };
 
     const i = try cator.create(Id);
@@ -448,8 +441,7 @@ pub fn create_sample() Allocator.Error!Tree {
     const ebar = try cator.create(Expr);
     ebar.* = Expr{ .e_const = 10 };
 
-    const seq = try cator.create(ComSeq);
-    seq.* = blk: {
+    const seq = blk: {
         var coms = try std.ArrayList(Com).initCapacity(cator, 2);
         coms.appendAssumeCapacity(.{ .asgn = .{ .x = i, .a = ep } });
         coms.appendAssumeCapacity(.{ .asgn = .{ .x = ibar, .a = ebar } });
@@ -457,7 +449,30 @@ pub fn create_sample() Allocator.Error!Tree {
         break :blk ComSeq{ .coms = coms };
     };
 
-    return seq.to_tree();
+    const ibaz = try cator.create(Id);
+    ibaz.* = .{ .id = "baz" };
+
+    const ebaz = try cator.create(Expr);
+    ebaz.* = Expr{ .e_const = 200 };
+
+    const seq2 = blk: {
+        var coms = try std.ArrayList(Com).initCapacity(cator, 1);
+        coms.appendAssumeCapacity(.{ .asgn = .{ .x = ibar, .a = ebaz } });
+
+        break :blk ComSeq{ .coms = coms };
+    };
+
+    const cond = try cator.create(BExpr);
+    cond.* = BExpr{ .@"const" = true };
+
+    const if_stmt = try cator.create(Com);
+    if_stmt.* = Com{ .conditional = .{
+        .cond = cond,
+        .then_branch = seq,
+        .else_branch = seq2,
+    } };
+
+    return if_stmt.to_tree();
 }
 
 const ComSeq = struct {
@@ -469,7 +484,7 @@ const ComSeq = struct {
         self.coms.deinit(cator);
     }
 
-    pub fn render(self: *Self, sink: *Sink) !void {
+    pub fn render(self: *const Self, sink: *Sink) !void {
         sink.start_node(self);
 
         if (0 < self.coms.items.len) {
@@ -548,6 +563,259 @@ const ComSeq = struct {
         .remove_at = remove_at,
         .make_into_hole = make_into_hole,
         .render = raw_render,
+        .replacement_offers = replacement_offers,
+    };
+
+    pub fn to_tree(self: *Self) Tree {
+        return .{ .ptr = self, .vtable = &vt };
+    }
+};
+
+const BExpr = union(enum) {
+    @"const": bool,
+    comparison: struct { left: *Expr, op: ComparisonOperator, right: *Expr },
+    not: *BExpr,
+    operation: assoc.Operation(OperandType, OperatorType),
+    hole,
+
+    pub const OperatorType = enum {
+        @"or",
+        @"and",
+
+        pub fn is_not_greater_than(a: @This(), b: @This()) bool {
+            return @intFromEnum(a) <= @intFromEnum(b);
+        }
+
+        pub fn render(self: @This(), sink: *Sink) !void {
+            try sink.append_ascii(switch (self) {
+                .@"or" => "or",
+                .@"and" => "and",
+            });
+        }
+    };
+
+    const OperandType = Self;
+
+    const ComparisonOperator = enum {
+        is_less_than,
+        equals,
+    };
+
+    const Self = @This();
+
+    pub fn drop(self: *Self) void {
+        switch (self.*) {
+            .@"const" => {},
+            .comparison => |x| {
+                x.left.drop();
+                cator.destroy(x.left);
+
+                x.right.drop();
+                cator.destroy(x.right);
+            },
+            .not => |b0| {
+                b0.drop();
+                cator.destroy(b0);
+            },
+            .operation => |*op| {
+                op.drop();
+            },
+            .hole => {},
+        }
+    }
+
+    pub fn render(self: *const Self, sink: *Sink, parent_op: ?OperatorType) !void {
+        sink.start_node(self);
+
+        switch (self.*) {
+            .@"const" => |b0| try sink.append_ascii(switch (b0) {
+                true => "true",
+                false => "false",
+            }),
+            .comparison => |x| {
+                try x.left.render(sink, null);
+
+                try sink.append_ascii(" ");
+                try sink.append_ascii(switch (x.op) {
+                    .is_less_than => "<",
+                    .equals => "=",
+                });
+                try sink.append_ascii(" ");
+
+                try x.right.render(sink, null);
+            },
+            .not => |be0| {
+                try sink.append_ascii("not ");
+                // The value for `parent_op` is a hack that should make parentheses
+                // work correctly. TODO clean up.
+                try be0.render(sink, .@"and");
+            },
+            .operation => |op| {
+                try op.render(sink, parent_op);
+            },
+            .hole => {
+                try sink.append("◆", 1);
+            },
+        }
+
+        sink.end_node(self);
+    }
+
+    fn child_count(ptr: *anyopaque) usize {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        return switch (self.*) {
+            .@"const" => 0,
+            .comparison => 2,
+            .not => 1,
+            .operation => |op| op.operands.items.len,
+            .hole => 0,
+        };
+    }
+
+    fn get_nth_child(ptr: *anyopaque, n: usize) ?Tree {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        return switch (self.*) {
+            .@"const" => null,
+            .comparison => |x| switch (n) {
+                0 => x.left.to_tree(),
+                1 => x.right.to_tree(),
+                else => null,
+            },
+            .not => |b0| switch (n) {
+                0 => b0.to_tree(),
+                else => null,
+            },
+            .operation => |op| if (op.get_nth_child(n)) |x| x.to_tree() else null,
+            .hole => null,
+        };
+    }
+
+    fn insert_at(ptr: *anyopaque, i: usize) bool {
+        _ = ptr;
+        _ = i;
+        return false;
+    }
+
+    fn remove_at(ptr: *anyopaque, i: usize) Tree.RemovalOutcome {
+        _ = ptr;
+        _ = i;
+        return .not_possible;
+    }
+
+    fn make_into_hole(ptr: *anyopaque) void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        self.drop();
+        self.* = .hole;
+    }
+
+    fn rewrite_as_false(ptr: *anyopaque) Allocator.Error!void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
+
+        self.* = .{ .@"const" = false };
+    }
+
+    fn rewrite_as_true(ptr: *anyopaque) Allocator.Error!void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
+
+        self.* = .{ .@"const" = true };
+    }
+
+    fn rewrite_as_not(ptr: *anyopaque) Allocator.Error!void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
+
+        const b0 = try cator.create(BExpr);
+        b0.* = .hole;
+
+        self.* = .{ .not = b0 };
+    }
+
+    fn rewrite_as_lt(ptr: *anyopaque) Allocator.Error!void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
+
+        const l = try cator.create(Expr);
+        l.* = .e_hole;
+
+        const r = try cator.create(Expr);
+        r.* = .e_hole;
+
+        self.* = .{ .comparison = .{ .left = l, .op = .is_less_than, .right = r } };
+    }
+
+    fn rewrite_as_eq(ptr: *anyopaque) Allocator.Error!void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
+
+        const l = try cator.create(Expr);
+        l.* = .e_hole;
+
+        const r = try cator.create(Expr);
+        r.* = .e_hole;
+
+        self.* = .{ .comparison = .{ .left = l, .op = .equals, .right = r } };
+    }
+
+    fn rewrite_as_and(ptr: *anyopaque) Allocator.Error!void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
+
+        self.* = .{
+            .operation = try assoc.Operation(OperandType, OperatorType).make_initial_value(.@"and", .hole),
+        };
+    }
+
+    fn rewrite_as_or(ptr: *anyopaque) Allocator.Error!void {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+        self.drop();
+
+        self.* = .{
+            .operation = try assoc.Operation(OperandType, OperatorType).make_initial_value(.@"or", .hole),
+        };
+    }
+
+    const replacement_offers = &[_]Offer{
+        .{
+            .name = "false",
+            .rewriter = .{ .from_void = rewrite_as_false },
+        },
+        .{
+            .name = "true",
+            .rewriter = .{ .from_void = rewrite_as_true },
+        },
+        .{
+            .name = "less than",
+            .rewriter = .{ .from_void = rewrite_as_lt },
+        },
+        .{
+            .name = "equals",
+            .rewriter = .{ .from_void = rewrite_as_eq },
+        },
+        .{
+            .name = "not",
+            .rewriter = .{ .from_void = rewrite_as_not },
+        },
+        .{
+            .name = "and",
+            .rewriter = .{ .from_void = rewrite_as_and },
+        },
+        .{
+            .name = "or",
+            .rewriter = .{ .from_void = rewrite_as_or },
+        },
+    };
+
+    const vt = VTable{
+        .child_count = child_count,
+        .get_nth_child = get_nth_child,
+        .insert_at = insert_at,
+        .remove_at = remove_at,
+        .make_into_hole = make_into_hole,
         .replacement_offers = replacement_offers,
     };
 
