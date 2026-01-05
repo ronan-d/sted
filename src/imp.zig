@@ -442,8 +442,8 @@ const Com = union(enum) {
         self.* = .{
             .conditional = .{
                 .cond = cond,
-                .then_branch = .{ .coms = std.ArrayList(Com).empty },
-                .else_branch = .{ .coms = std.ArrayList(Com).empty },
+                .then_branch = try ComSeq.initial_value(),
+                .else_branch = try ComSeq.initial_value(),
             },
         };
     }
@@ -458,7 +458,7 @@ const Com = union(enum) {
         self.* = .{
             .while_loop = .{
                 .cond = cond,
-                .commands = .{ .coms = std.ArrayList(Com).empty },
+                .commands = try ComSeq.initial_value(),
             },
         };
     }
@@ -595,6 +595,13 @@ const ComSeq = struct {
         }
 
         sink.end_node(self);
+    }
+
+    pub fn initial_value() !Self {
+        var coms = try std.ArrayList(Com).initCapacity(cator, 1);
+        coms.appendAssumeCapacity(.hole);
+
+        return Self{ .coms = coms };
     }
 
     fn child_count(ptr: *anyopaque) usize {
