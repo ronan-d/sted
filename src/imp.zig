@@ -303,23 +303,42 @@ const Com = union(enum) {
 
                 try x.cond.render(sink, null);
 
-                // TODO line breaks and indentation.
-                try sink.append_ascii(" then ");
+                try sink.append_ascii(" then");
+
+                sink.increase_indentation();
+
+                try sink.break_line();
 
                 try x.then_branch.render(sink);
 
-                try sink.append_ascii(" else ");
+                sink.decrease_indentation();
+
+                try sink.break_line();
+
+                try sink.append_ascii("else");
+
+                sink.increase_indentation();
+
+                try sink.break_line();
 
                 try x.else_branch.render(sink);
+
+                sink.decrease_indentation();
             },
             .while_loop => |*x| {
                 try sink.append_ascii("while ");
 
                 try x.cond.render(sink, null);
 
-                try sink.append_ascii(" do ");
+                try sink.append_ascii(" do");
+
+                sink.increase_indentation();
+
+                try sink.break_line();
 
                 try x.commands.render(sink);
+
+                sink.decrease_indentation();
             },
             .hole => {
                 try sink.append("◆", 1);
@@ -571,7 +590,7 @@ const ComSeq = struct {
                     break;
                 }
 
-                try sink.append_ascii(";\n");
+                try sink.break_line();
             }
         }
 

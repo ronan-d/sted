@@ -56,6 +56,7 @@ pub const Srcprg = struct {
                 .cursor_end = undefined,
                 .cursor = x.ptr,
                 .code_point_counter = 0,
+                .indentation_level = 0,
             },
         };
     }

@@ -11,6 +11,9 @@ pub const Sink = struct {
     cursor_start: usize,
     cursor_end: usize,
     code_point_counter: usize,
+    indentation_level: usize,
+
+    const indentation_unit = 2;
 
     const Self = @This();
 
@@ -38,5 +41,24 @@ pub const Sink = struct {
     pub fn clear(self: *Self) void {
         self.buf.clearRetainingCapacity();
         self.code_point_counter = 0;
+    }
+
+    pub fn increase_indentation(self: *Self) void {
+        self.indentation_level += 1;
+    }
+
+    pub fn decrease_indentation(self: *Self) void {
+        self.indentation_level -= 1;
+    }
+
+    pub fn break_line(self: *Self) !void {
+        const n = self.indentation_level * indentation_unit;
+
+        try self.buf.ensureUnusedCapacity(cator, n + 1);
+        self.buf.appendAssumeCapacity('\n');
+        for (0..n) |_| {
+            self.buf.appendAssumeCapacity(' ');
+        }
+        self.code_point_counter += n + 1;
     }
 };
