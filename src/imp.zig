@@ -303,7 +303,11 @@ const Com = union(enum) {
 
                 try x.cond.render(sink, null);
 
-                try sink.append_ascii(" then");
+                try sink.append_ascii(" ");
+
+                sink.start_node(&x.then_branch);
+
+                try sink.append_ascii("then");
 
                 sink.increase_indentation();
 
@@ -314,6 +318,8 @@ const Com = union(enum) {
                 sink.decrease_indentation();
 
                 try sink.break_line();
+
+                sink.start_node(&x.else_branch);
 
                 try sink.append_ascii("else");
 
@@ -330,7 +336,11 @@ const Com = union(enum) {
 
                 try x.cond.render(sink, null);
 
-                try sink.append_ascii(" do");
+                try sink.append_ascii(" ");
+
+                sink.start_node(&x.commands);
+
+                try sink.append_ascii("do");
 
                 sink.increase_indentation();
 
@@ -579,8 +589,6 @@ const ComSeq = struct {
     }
 
     pub fn render(self: *const Self, sink: *Sink) !void {
-        sink.start_node(self);
-
         if (0 < self.coms.items.len) {
             var i: usize = 0;
             while (true) {
@@ -656,6 +664,7 @@ const ComSeq = struct {
     fn raw_render(ptr: *anyopaque, sink: *Sink) Allocator.Error!void {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
+        sink.start_node(self);
         return self.render(sink);
     }
 
