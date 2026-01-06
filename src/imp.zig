@@ -547,7 +547,7 @@ pub fn create_sample() Allocator.Error!Tree {
 
     const seq2 = blk: {
         var coms = try std.ArrayList(Com).initCapacity(cator, 1);
-        coms.appendAssumeCapacity(.{ .asgn = .{ .x = ibar, .a = ebaz } });
+        coms.appendAssumeCapacity(.{ .asgn = .{ .x = ibaz, .a = ebaz } });
 
         break :blk ComSeq{ .coms = coms };
     };
