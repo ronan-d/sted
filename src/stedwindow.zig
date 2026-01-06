@@ -54,7 +54,7 @@ pub const StedWindow = extern struct {
         const text_view = sourceview.View.new();
         text_view.as(gtk.TextView).setEditable(0);
         text_view.as(gtk.TextView).setCursorVisible(0);
-        text_view.as(gtk.TextView).setMonospace(0);
+        text_view.as(gtk.TextView).setMonospace(1);
 
         const toolbar_view = adw.ToolbarView.new();
 
