@@ -631,6 +631,10 @@ const ComSeq = struct {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
         if (i < self.coms.items.len) {
+            if (self.coms.items.len == 1) {
+                return .not_possible;
+            }
+
             var x = self.coms.orderedRemove(i);
             x.drop();
 
