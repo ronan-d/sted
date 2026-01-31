@@ -123,7 +123,7 @@ fn traverse_dynamically(
 
                     while (true) {
                         const up_instr = try self.traverse_dynamically(
-                            node.getNthChild(i) orelse std.process.exit(1),
+                            node.getNthChild(i),
                             .go_down,
                         );
 

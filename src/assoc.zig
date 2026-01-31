@@ -63,8 +63,8 @@ pub fn Operation(
             return Self{ .operator = operator, .operands = operands };
         }
 
-        pub fn childAt(self: Self, i: usize) ?*OperandType {
-            return if (i < self.operands.items.len) &self.operands.items[i] else null;
+        pub fn childAt(self: Self, i: usize) *OperandType {
+            return &self.operands.items[i];
         }
 
         pub fn insertAt(self: *Self, i: usize, hole: OperandType) !bool {

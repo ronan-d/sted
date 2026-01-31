@@ -9,7 +9,7 @@ const Sink = @import("render.zig").Sink;
 pub const VTable = struct {
     childCount: *const fn (*anyopaque) usize,
 
-    childAt: *const fn (*anyopaque, i: usize) ?Self,
+    childAt: *const fn (*anyopaque, i: usize) Self,
 
     insertAt: *const fn (*anyopaque, i: usize) bool,
 
@@ -26,7 +26,7 @@ pub fn childCount(self: *Self) usize {
     return self.vtable.childCount(self.ptr);
 }
 
-pub fn getNthChild(self: *Self, n: usize) ?Self {
+pub fn getNthChild(self: *Self, n: usize) Self {
     return self.vtable.childAt(self.ptr, n);
 }
 

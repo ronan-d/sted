@@ -78,13 +78,12 @@ const AExp = union(enum) {
         };
     }
 
-    fn childAt(ptr: *anyopaque, n: usize) ?Tree {
+    fn childAt(ptr: *anyopaque, i: usize) Tree {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
         return switch (self.*) {
-            .lit => null,
-            .assop => |op| if (op.childAt(n)) |x| x.to_tree() else null,
-            .hole => null,
+            .assop => |op| op.childAt(i).to_tree(),
+            else => unreachable,
         };
     }
 
@@ -198,8 +197,8 @@ const Id = union(enum) {
         return 0;
     }
 
-    fn childAt(_: *anyopaque, _: usize) ?Tree {
-        return null;
+    fn childAt(_: *anyopaque, _: usize) Tree {
+        unreachable;
     }
 
     fn insertAt(_: *anyopaque, _: usize) bool {
@@ -365,28 +364,27 @@ const Com = union(enum) {
         };
     }
 
-    fn childAt(ptr: *anyopaque, n: usize) ?Tree {
+    fn childAt(ptr: *anyopaque, i: usize) Tree {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
         return switch (self.*) {
-            .skip => null,
-            .asgn => |s| switch (n) {
+            .asgn => |s| switch (i) {
                 0 => s.x.to_tree(),
                 1 => s.a.to_tree(),
-                else => null,
+                else => unreachable,
             },
-            .conditional => |*x| switch (n) {
+            .conditional => |*x| switch (i) {
                 0 => x.cond.to_tree(),
                 1 => x.then_branch.to_tree(),
                 2 => x.else_branch.to_tree(),
-                else => null,
+                else => unreachable,
             },
-            .while_loop => |*x| switch (n) {
+            .while_loop => |*x| switch (i) {
                 0 => x.cond.to_tree(),
                 1 => x.commands.to_tree(),
-                else => null,
+                else => unreachable,
             },
-            .hole => null,
+            else => unreachable,
         };
     }
 
@@ -601,10 +599,10 @@ const ComSeq = struct {
         return self.coms.items.len;
     }
 
-    fn childAt(ptr: *anyopaque, n: usize) ?Tree {
+    fn childAt(ptr: *anyopaque, n: usize) Tree {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
-        return if (n < self.coms.items.len) self.coms.items[n].to_tree() else null;
+        return self.coms.items[n].to_tree();
     }
 
     fn insertAt(ptr: *anyopaque, i: usize) bool {
@@ -761,22 +759,21 @@ const BExp = union(enum) {
         };
     }
 
-    fn childAt(ptr: *anyopaque, n: usize) ?Tree {
+    fn childAt(ptr: *anyopaque, i: usize) Tree {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
         return switch (self.*) {
-            .@"const" => null,
-            .comparison => |x| switch (n) {
+            .comparison => |x| switch (i) {
                 0 => x.left.to_tree(),
                 1 => x.right.to_tree(),
-                else => null,
+                else => unreachable,
             },
-            .not => |b0| switch (n) {
+            .not => |b0| switch (i) {
                 0 => b0.to_tree(),
-                else => null,
+                else => unreachable,
             },
-            .operation => |op| if (op.childAt(n)) |x| x.to_tree() else null,
-            .hole => null,
+            .operation => |op| op.childAt(i).to_tree(),
+            else => unreachable,
         };
     }
 
