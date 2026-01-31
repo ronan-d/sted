@@ -87,12 +87,12 @@ const AExp = union(enum) {
         };
     }
 
-    fn insertAt(ptr: *anyopaque, i: usize) bool {
+    fn insertAt(ptr: *anyopaque, i: usize) Error!bool {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
         return switch (self.*) {
             .assop => |*p| {
-                return p.insertAt(i, .hole) catch unreachable;
+                return p.insertAt(i, .hole);
             },
             else => return false,
         };
@@ -201,7 +201,7 @@ const Id = union(enum) {
         unreachable;
     }
 
-    fn insertAt(_: *anyopaque, _: usize) bool {
+    fn insertAt(_: *anyopaque, _: usize) Error!bool {
         return false;
     }
 
@@ -388,7 +388,7 @@ const Com = union(enum) {
         };
     }
 
-    fn insertAt(_: *anyopaque, _: usize) bool {
+    fn insertAt(_: *anyopaque, _: usize) Error!bool {
         return false;
     }
 
@@ -491,6 +491,7 @@ const OpList = std.ArrayList(AExp);
 
 const cator = std.heap.c_allocator;
 const Allocator = std.mem.Allocator;
+const Error = Allocator.Error;
 
 pub fn create_sample() Allocator.Error!Tree {
     const e3 = try cator.create(AExp);
@@ -605,11 +606,11 @@ const ComSeq = struct {
         return self.coms.items[n].to_tree();
     }
 
-    fn insertAt(ptr: *anyopaque, i: usize) bool {
+    fn insertAt(ptr: *anyopaque, i: usize) Error!bool {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
         if (i <= self.coms.items.len) {
-            self.coms.insert(cator, i, Com.hole) catch unreachable;
+            try self.coms.insert(cator, i, Com.hole);
             return true;
         }
 
@@ -777,14 +778,14 @@ const BExp = union(enum) {
         };
     }
 
-    fn insertAt(ptr: *anyopaque, i: usize) bool {
+    fn insertAt(ptr: *anyopaque, i: usize) Error!bool {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
         return switch (self.*) {
             .@"const" => false,
             .comparison => false,
             .not => false,
-            .operation => |*op| op.insertAt(i, .hole) catch unreachable,
+            .operation => |*op| op.insertAt(i, .hole),
             .hole => false,
         };
     }

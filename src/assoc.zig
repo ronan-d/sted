@@ -67,7 +67,7 @@ pub fn Operation(
             return &self.operands.items[i];
         }
 
-        pub fn insertAt(self: *Self, i: usize, hole: OperandType) !bool {
+        pub fn insertAt(self: *Self, i: usize, hole: OperandType) Error!bool {
             if (i <= self.operands.items.len) {
                 try self.operands.insert(cator, i, hole);
                 return true;

@@ -142,10 +142,10 @@ fn traverse_dynamically(
                                 break;
                             },
                             .insert_before => {
-                                _ = node.insertAt(i);
+                                _ = try node.insertAt(i);
                             },
                             .insert_after => {
-                                if (node.insertAt(i + 1)) {
+                                if (try node.insertAt(i + 1)) {
                                     i += 1;
                                 }
                             },

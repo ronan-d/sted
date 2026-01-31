@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const Error = Allocator.Error;
 
 ptr: *anyopaque,
 vtable: *const VTable,
@@ -11,7 +12,7 @@ pub const VTable = struct {
 
     childAt: *const fn (*anyopaque, i: usize) Self,
 
-    insertAt: *const fn (*anyopaque, i: usize) bool,
+    insertAt: *const fn (*anyopaque, i: usize) Error!bool,
 
     removeAt: *const fn (*anyopaque, i: usize) RemovalOutcome,
 
@@ -30,7 +31,7 @@ pub fn childAt(self: *Self, n: usize) Self {
     return self.vtable.childAt(self.ptr, n);
 }
 
-pub fn insertAt(self: *Self, i: usize) bool {
+pub fn insertAt(self: *Self, i: usize) Error!bool {
     return self.vtable.insertAt(self.ptr, i);
 }
 
