@@ -312,6 +312,10 @@ const Com = union(enum) {
                 try x.else_branch.render(sink);
 
                 sink.decreaseIndentation();
+
+                try sink.breakLine();
+
+                try sink.appendAscii("end");
             },
             .while_loop => |*x| {
                 try sink.appendAscii("while ");
@@ -331,6 +335,10 @@ const Com = union(enum) {
                 try x.commands.render(sink);
 
                 sink.decreaseIndentation();
+
+                try sink.breakLine();
+
+                try sink.appendAscii("end");
             },
             .hole => {
                 try sink.append("◆", 1);
@@ -572,6 +580,7 @@ const ComSeq = struct {
                     break;
                 }
 
+                try sink.appendAscii(";");
                 try sink.breakLine();
             }
         }
