@@ -19,7 +19,6 @@ pub const instruction = union(enum) {
     go_down,
     insert_before,
     insert_after,
-    make_into_hole,
     remove_cursor_node,
 };
 
@@ -119,12 +118,12 @@ fn traverse_dynamically(
             .go_up => return .do_nothing,
             .go_left => return .go_left,
             .go_down => {
-                if (0 < node.child_count()) {
+                if (0 < node.childCount()) {
                     var i: usize = 0;
 
                     while (true) {
                         const up_instr = try self.traverse_dynamically(
-                            node.get_nth_child(i) orelse std.process.exit(1),
+                            node.getNthChild(i) orelse std.process.exit(1),
                             .go_down,
                         );
 
@@ -135,7 +134,7 @@ fn traverse_dynamically(
                                 }
                             },
                             .go_right => {
-                                if (i + 1 < node.child_count()) {
+                                if (i + 1 < node.childCount()) {
                                     i += 1;
                                 }
                             },
@@ -143,15 +142,15 @@ fn traverse_dynamically(
                                 break;
                             },
                             .insert_before => {
-                                _ = node.insert_at(i);
+                                _ = node.insertAt(i);
                             },
                             .insert_after => {
-                                if (node.insert_at(i + 1)) {
+                                if (node.insertAt(i + 1)) {
                                     i += 1;
                                 }
                             },
                             .remove_cursor_node => {
-                                switch (node.remove_at(i)) {
+                                switch (node.removeAt(i)) {
                                     .done => |x| i = x.new_index,
                                     .not_possible => {},
                                     .replaced => break,
@@ -163,9 +162,6 @@ fn traverse_dynamically(
             },
             .insert_before => return .insert_before,
             .insert_after => return .insert_after,
-            .make_into_hole => {
-                node.make_into_hole();
-            },
             .remove_cursor_node => return .remove_cursor_node,
         }
 

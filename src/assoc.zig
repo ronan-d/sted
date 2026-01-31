@@ -27,12 +27,12 @@ pub fn Operation(
         pub fn render(self: Self, sink: *Sink, parent_operator: ?OperatorType) Error!void {
             // The absence of {start,end}_node calls is deliberate.
 
-            const is_not_greater_than = @field(OperatorType, "is_not_greater_than");
+            const is_not_greater_than = @field(OperatorType, "isNotGreaterThan");
 
             const need_parentheses = if (parent_operator) |po| is_not_greater_than(self.operator, po) else false;
 
             if (need_parentheses) {
-                try sink.append_ascii("(");
+                try sink.appendAscii("(");
             }
 
             const render_operand = @field(OperandType, "render");
@@ -42,16 +42,16 @@ pub fn Operation(
                 try render_operand(&self.operands.items[0], sink, self.operator);
 
                 for (self.operands.items[1..]) |*operand| {
-                    try sink.append_ascii(" ");
+                    try sink.appendAscii(" ");
                     try render_operator(self.operator, sink);
-                    try sink.append_ascii(" ");
+                    try sink.appendAscii(" ");
 
                     try render_operand(operand, sink, self.operator);
                 }
             }
 
             if (need_parentheses) {
-                try sink.append_ascii(")");
+                try sink.appendAscii(")");
             }
         }
 
@@ -63,11 +63,11 @@ pub fn Operation(
             return Self{ .operator = operator, .operands = operands };
         }
 
-        pub fn get_nth_child(self: Self, n: usize) ?*OperandType {
-            return if (n < self.operands.items.len) &self.operands.items[n] else null;
+        pub fn childAt(self: Self, i: usize) ?*OperandType {
+            return if (i < self.operands.items.len) &self.operands.items[i] else null;
         }
 
-        pub fn insert_at(self: *Self, i: usize, hole: OperandType) !bool {
+        pub fn insertAt(self: *Self, i: usize, hole: OperandType) !bool {
             if (i <= self.operands.items.len) {
                 try self.operands.insert(cator, i, hole);
                 return true;
@@ -81,7 +81,7 @@ pub fn Operation(
             replaced: OperandType,
         };
 
-        pub fn remove_at(self: *Self, i: usize) RemovalOutcome {
+        pub fn removeAt(self: *Self, i: usize) RemovalOutcome {
             // orderedRemove makes the same assertion, but we keep this one for now.
             std.debug.assert(i < self.operands.items.len);
 

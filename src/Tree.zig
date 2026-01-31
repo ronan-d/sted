@@ -7,33 +7,31 @@ vtable: *const VTable,
 const Sink = @import("render.zig").Sink;
 
 pub const VTable = struct {
-    child_count: *const fn (*anyopaque) usize,
+    childCount: *const fn (*anyopaque) usize,
 
-    get_nth_child: *const fn (*anyopaque, n: usize) ?Self,
+    childAt: *const fn (*anyopaque, i: usize) ?Self,
 
-    insert_at: *const fn (*anyopaque, i: usize) bool,
+    insertAt: *const fn (*anyopaque, i: usize) bool,
 
-    remove_at: *const fn (*anyopaque, i: usize) RemovalOutcome,
-
-    make_into_hole: *const fn (*anyopaque) void,
+    removeAt: *const fn (*anyopaque, i: usize) RemovalOutcome,
 
     render: ?*const fn (*anyopaque, sink: *Sink) Allocator.Error!void = null,
 
-    replacement_offers: []const Offer,
+    replacementOffers: []const Offer,
 };
 
 const Self = @This();
 
-pub fn child_count(self: *Self) usize {
-    return self.vtable.child_count(self.ptr);
+pub fn childCount(self: *Self) usize {
+    return self.vtable.childCount(self.ptr);
 }
 
-pub fn get_nth_child(self: *Self, n: usize) ?Self {
-    return self.vtable.get_nth_child(self.ptr, n);
+pub fn getNthChild(self: *Self, n: usize) ?Self {
+    return self.vtable.childAt(self.ptr, n);
 }
 
-pub fn insert_at(self: *Self, i: usize) bool {
-    return self.vtable.insert_at(self.ptr, i);
+pub fn insertAt(self: *Self, i: usize) bool {
+    return self.vtable.insertAt(self.ptr, i);
 }
 
 pub const RemovalOutcome = union(enum) {
@@ -44,12 +42,8 @@ pub const RemovalOutcome = union(enum) {
     replaced,
 };
 
-pub fn remove_at(self: *Self, i: usize) RemovalOutcome {
-    return self.vtable.remove_at(self.ptr, i);
-}
-
-pub fn make_into_hole(self: *Self) void {
-    self.vtable.make_into_hole(self.ptr);
+pub fn removeAt(self: *Self, i: usize) RemovalOutcome {
+    return self.vtable.removeAt(self.ptr, i);
 }
 
 pub fn render(self: *Self, sink: *Sink) Allocator.Error!void {
@@ -69,6 +63,6 @@ pub const Offer = struct {
     rewriter: Rewriter,
 };
 
-pub fn get_offers(self: *const Self) []const Offer {
-    return self.vtable.replacement_offers;
+pub fn getOffers(self: *const Self) []const Offer {
+    return self.vtable.replacementOffers;
 }

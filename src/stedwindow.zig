@@ -121,7 +121,7 @@ pub const StedWindow = extern struct {
         dialog.setFollowsContentSize(1);
         dialog.setPresentationMode(adw.DialogPresentationMode.floating);
 
-        const offers = self.srcprg.cursor.cursor_pos.get_offers();
+        const offers = self.srcprg.cursor.cursor_pos.getOffers();
 
         for (offers) |offer| {
             const button = gtk.Button.newWithMnemonic(offer.name);

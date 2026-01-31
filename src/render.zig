@@ -17,13 +17,13 @@ pub const Sink = struct {
 
     const Self = @This();
 
-    pub fn start_node(self: *Self, node: *const anyopaque) void {
+    pub fn startNode(self: *Self, node: *const anyopaque) void {
         if (self.cursor == node) {
             self.cursor_start = self.code_point_counter;
         }
     }
 
-    pub fn end_node(self: *Self, node: *const anyopaque) void {
+    pub fn endNode(self: *Self, node: *const anyopaque) void {
         if (self.cursor == node) {
             self.cursor_end = self.code_point_counter;
         }
@@ -34,7 +34,7 @@ pub const Sink = struct {
         self.code_point_counter += n_code_points;
     }
 
-    pub fn append_ascii(self: *Self, s: []const u8) Error!void {
+    pub fn appendAscii(self: *Self, s: []const u8) Error!void {
         try self.append(s, s.len);
     }
 
@@ -43,15 +43,15 @@ pub const Sink = struct {
         self.code_point_counter = 0;
     }
 
-    pub fn increase_indentation(self: *Self) void {
+    pub fn increaseIndentation(self: *Self) void {
         self.indentation_level += 1;
     }
 
-    pub fn decrease_indentation(self: *Self) void {
+    pub fn decreaseIndentation(self: *Self) void {
         self.indentation_level -= 1;
     }
 
-    pub fn break_line(self: *Self) !void {
+    pub fn breakLine(self: *Self) !void {
         const n = self.indentation_level * indentation_unit;
 
         try self.buf.ensureUnusedCapacity(cator, n + 1);

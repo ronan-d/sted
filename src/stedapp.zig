@@ -50,8 +50,6 @@ pub const StedApp = extern struct {
             app.bind_instruction_to_key(win, .insert_before, gdk.KEY_s);
             app.bind_instruction_to_key(win, .insert_after, gdk.KEY_d);
 
-            app.bind_instruction_to_key(win, .make_into_hole, gdk.KEY_f);
-
             app.bind_instruction_to_key(win, .remove_cursor_node, gdk.KEY_r);
 
             app.register_accel("open-num-dialog", gdk.KEY_a);
