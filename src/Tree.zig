@@ -26,7 +26,7 @@ pub fn childCount(self: *Self) usize {
     return self.vtable.childCount(self.ptr);
 }
 
-pub fn getNthChild(self: *Self, n: usize) Self {
+pub fn childAt(self: *Self, n: usize) Self {
     return self.vtable.childAt(self.ptr, n);
 }
 

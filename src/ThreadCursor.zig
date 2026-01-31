@@ -123,7 +123,7 @@ fn traverse_dynamically(
 
                     while (true) {
                         const up_instr = try self.traverse_dynamically(
-                            node.getNthChild(i),
+                            node.childAt(i),
                             .go_down,
                         );
 
