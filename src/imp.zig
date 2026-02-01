@@ -105,9 +105,7 @@ const AExp = union(enum) {
             .assop => |*p| {
                 switch (p.removeAt(i)) {
                     .normal => {
-                        const new_index = if (p.operands.items.len == i) i - 1 else i;
-
-                        return .{ .done = .{ .new_index = new_index } };
+                        return .done;
                     },
                     .replaced => |x| {
                         self.* = x;
@@ -628,8 +626,7 @@ const ComSeq = struct {
             var x = self.coms.orderedRemove(i);
             x.drop();
 
-            const new_index = if (i == self.coms.items.len) i - 1 else i;
-            return .{ .done = .{ .new_index = new_index } };
+            return .done;
         }
 
         @panic("Invalid removeAt call");
@@ -800,8 +797,7 @@ const BExp = union(enum) {
             .operation => |*p| blk: {
                 switch (p.removeAt(i)) {
                     .normal => {
-                        const new_index = if (p.operands.items.len == i) i - 1 else i;
-                        break :blk .{ .done = .{ .new_index = new_index } };
+                        break :blk .done;
                     },
                     .replaced => |x| {
                         self.* = x;

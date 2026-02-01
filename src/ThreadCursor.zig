@@ -151,7 +151,11 @@ fn traverse_dynamically(
                             },
                             .remove_cursor_node => {
                                 switch (node.removeAt(i)) {
-                                    .done => |x| i = x.new_index,
+                                    .done => {
+                                        if (i == node.childCount()) {
+                                            i = i - 1;
+                                        }
+                                    },
                                     .not_possible => {},
                                     .replaced => break,
                                 }

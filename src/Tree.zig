@@ -36,7 +36,7 @@ pub fn insertAt(self: *Self, i: usize) Error!bool {
 }
 
 pub const RemovalOutcome = union(enum) {
-    done: struct { new_index: usize },
+    done,
     not_possible,
     // "Replaced" means that the removal was performed and resulted in a
     // single-element list that was replaced with the single element directly.
