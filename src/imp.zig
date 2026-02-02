@@ -176,6 +176,13 @@ const Id = union(enum) {
 
     const Self = @This();
 
+    fn drop(self: *Self) void {
+        switch (self.*) {
+            .id => |s| cator.free(s),
+            .hole => {},
+        }
+    }
+
     pub fn render(self: *Self, sink: *Sink) !void {
         sink.startNode(self);
 
@@ -247,7 +254,10 @@ const Com = union(enum) {
     pub fn drop(self: *Self) void {
         switch (self.*) {
             .skip => {},
-            .asgn => |p| p.a.drop(),
+            .asgn => |p| {
+                p.x.drop();
+                p.a.drop();
+            },
             .conditional => |*x| {
                 x.cond.drop();
                 cator.destroy(x.cond);
