@@ -24,8 +24,8 @@ const AExp = union(enum) {
 
         pub fn render(self: @This(), sink: *Sink) !void {
             try sink.appendAscii(switch (self) {
-                .add => "+",
-                .mul => "*",
+                .add => " + ",
+                .mul => " * ",
             });
         }
     };
@@ -672,8 +672,8 @@ const BExp = union(enum) {
 
         pub fn render(self: @This(), sink: *Sink) !void {
             try sink.appendAscii(switch (self) {
-                .@"or" => "or",
-                .@"and" => "and",
+                .@"or" => " or ",
+                .@"and" => " and ",
             });
         }
     };

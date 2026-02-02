@@ -42,9 +42,7 @@ pub fn Operation(
                 try render_operand(&self.operands.items[0], sink, self.operator);
 
                 for (self.operands.items[1..]) |*operand| {
-                    try sink.appendAscii(" ");
                     try render_operator(self.operator, sink);
-                    try sink.appendAscii(" ");
 
                     try render_operand(operand, sink, self.operator);
                 }
