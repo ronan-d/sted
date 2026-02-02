@@ -162,7 +162,7 @@ const AExp = union(enum) {
         .childAt = childAt,
         .insertAt = insertAt,
         .removeAt = removeAt,
-        .replacementOffers = replacement_offers,
+        .replacement_offers = replacement_offers,
     };
 
     pub fn to_tree(self: *Self) Tree {
@@ -232,7 +232,7 @@ const Id = union(enum) {
         .childAt = childAt,
         .insertAt = insertAt,
         .removeAt = removeAt,
-        .replacementOffers = replacement_offers,
+        .replacement_offers = replacement_offers,
     };
 
     pub fn to_tree(self: *Self) Tree {
@@ -487,7 +487,7 @@ const Com = union(enum) {
         .insertAt = insertAt,
         .removeAt = removeAt,
         .render = raw_render,
-        .replacementOffers = replacement_offers,
+        .replacement_offers = replacement_offers,
     };
 
     pub fn to_tree(self: *Self) Tree {
@@ -657,7 +657,7 @@ const ComSeq = struct {
         .insertAt = insertAt,
         .removeAt = removeAt,
         .render = raw_render,
-        .replacementOffers = replacement_offers,
+        .replacement_offers = replacement_offers,
     };
 
     pub fn to_tree(self: *Self) Tree {
@@ -923,7 +923,7 @@ const BExp = union(enum) {
         .childAt = childAt,
         .insertAt = insertAt,
         .removeAt = removeAt,
-        .replacementOffers = replacement_offers,
+        .replacement_offers = replacement_offers,
     };
 
     pub fn to_tree(self: *Self) Tree {

@@ -18,7 +18,7 @@ pub const VTable = struct {
 
     render: ?*const fn (*anyopaque, sink: *Sink) Allocator.Error!void = null,
 
-    replacementOffers: []const Offer,
+    replacement_offers: []const Offer,
 };
 
 const Self = @This();
@@ -65,5 +65,5 @@ pub const Offer = struct {
 };
 
 pub fn getOffers(self: *const Self) []const Offer {
-    return self.vtable.replacementOffers;
+    return self.vtable.replacement_offers;
 }
