@@ -45,11 +45,11 @@ const AExp = union(enum) {
     }
 
     pub fn render(
-        self: *const Self,
+        self: *Self,
         sink: *Sink,
         parent_op: ?OperatorType,
     ) !void {
-        sink.startNode(self);
+        sink.startNode(self.to_tree());
 
         switch (self.*) {
             .lit => |n| {
@@ -65,7 +65,7 @@ const AExp = union(enum) {
             },
         }
 
-        sink.endNode(self);
+        sink.endNode(self.to_tree());
     }
 
     fn childCount(ptr: *anyopaque) usize {
@@ -184,7 +184,7 @@ const Id = union(enum) {
     }
 
     pub fn render(self: *Self, sink: *Sink) !void {
-        sink.startNode(self);
+        sink.startNode(self.to_tree());
 
         switch (self.*) {
             .id => |s| {
@@ -195,7 +195,7 @@ const Id = union(enum) {
             },
         }
 
-        sink.endNode(self);
+        sink.endNode(self.to_tree());
     }
 
     fn childCount(_: *anyopaque) usize {
@@ -275,8 +275,8 @@ const Com = union(enum) {
         }
     }
 
-    pub fn render(self: *const Self, sink: *Sink) Allocator.Error!void {
-        sink.startNode(self);
+    pub fn render(self: *Self, sink: *Sink) Allocator.Error!void {
+        sink.startNode(self.to_tree());
 
         switch (self.*) {
             .skip => {
@@ -294,7 +294,7 @@ const Com = union(enum) {
 
                 try sink.appendAscii(" ");
 
-                sink.startNode(&x.then_branch);
+                sink.startNode(x.then_branch.to_tree());
 
                 try sink.appendAscii("then");
 
@@ -308,7 +308,7 @@ const Com = union(enum) {
 
                 try sink.breakLine();
 
-                sink.startNode(&x.else_branch);
+                sink.startNode(x.else_branch.to_tree());
 
                 try sink.appendAscii("else");
 
@@ -331,7 +331,7 @@ const Com = union(enum) {
 
                 try sink.appendAscii(" ");
 
-                sink.startNode(&x.commands);
+                sink.startNode(x.commands.to_tree());
 
                 try sink.appendAscii("do");
 
@@ -352,7 +352,7 @@ const Com = union(enum) {
             },
         }
 
-        sink.endNode(self);
+        sink.endNode(self.to_tree());
     }
 
     pub fn overwrite(p: *Com, c: Com) void {
@@ -577,7 +577,7 @@ const ComSeq = struct {
         self.coms.deinit(cator);
     }
 
-    pub fn render(self: *const Self, sink: *Sink) !void {
+    pub fn render(self: *Self, sink: *Sink) !void {
         if (0 < self.coms.items.len) {
             var i: usize = 0;
             while (true) {
@@ -592,7 +592,7 @@ const ComSeq = struct {
             }
         }
 
-        sink.endNode(self);
+        sink.endNode(self.to_tree());
     }
 
     pub fn initial_value() !Self {
@@ -645,7 +645,7 @@ const ComSeq = struct {
     fn raw_render(ptr: *anyopaque, sink: *Sink) Allocator.Error!void {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
-        sink.startNode(self);
+        sink.startNode(self.to_tree());
         return self.render(sink);
     }
 
@@ -718,8 +718,8 @@ const BExp = union(enum) {
         }
     }
 
-    pub fn render(self: *const Self, sink: *Sink, parent_op: ?OperatorType) !void {
-        sink.startNode(self);
+    pub fn render(self: *Self, sink: *Sink, parent_op: ?OperatorType) !void {
+        sink.startNode(self.to_tree());
 
         switch (self.*) {
             .@"const" => |b0| try sink.appendAscii(switch (b0) {
@@ -752,7 +752,7 @@ const BExp = union(enum) {
             },
         }
 
-        sink.endNode(self);
+        sink.endNode(self.to_tree());
     }
 
     fn childCount(ptr: *anyopaque) usize {

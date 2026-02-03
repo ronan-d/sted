@@ -20,7 +20,7 @@ pub const Srcprg = struct {
     pub fn render(self: *Self) !Frame {
         self.sink.clear();
 
-        self.sink.cursor = self.cursor.cursor_pos.ptr;
+        self.sink.cursor = self.cursor.cursor_pos;
         try self.tree.render(&self.sink);
 
         try self.sink.buf.append(cator, 0);
@@ -54,7 +54,7 @@ pub const Srcprg = struct {
                 .buf = .{},
                 .cursor_start = undefined,
                 .cursor_end = undefined,
-                .cursor = x.ptr,
+                .cursor = x,
                 .code_point_counter = 0,
                 .indentation_level = 0,
             },

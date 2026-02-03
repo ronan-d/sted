@@ -67,3 +67,7 @@ pub const Offer = struct {
 pub fn getOffers(self: *const Self) []const Offer {
     return self.vtable.replacement_offers;
 }
+
+pub fn eq(a: Self, b: Self) bool {
+    return a.ptr == b.ptr and a.vtable == b.vtable;
+}
