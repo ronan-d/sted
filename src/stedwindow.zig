@@ -49,7 +49,7 @@ pub const StedWindow = extern struct {
 
     fn init(self: *StedWindow, _: *Class) callconv(.c) void {
         self.as(gtk.Window).setTitle("hello");
-        self.as(gtk.Window).setDefaultSize(200, 200);
+        self.as(gtk.Window).setDefaultSize(800, 800);
 
         const text_view = sourceview.View.new();
         text_view.as(gtk.TextView).setEditable(0);
