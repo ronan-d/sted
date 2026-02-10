@@ -68,6 +68,12 @@ pub const StedWindow = extern struct {
 
         const buffer = text_view.as(gtk.TextView).getBuffer();
 
+        {
+            const source_buffer = gobject.ext.cast(sourceview.Buffer, buffer).?;
+
+            source_buffer.setHighlightMatchingBrackets(0);
+        }
+
         self.renderer = Renderer{
             .buffer = buffer,
             .tag = buffer.createTag(
