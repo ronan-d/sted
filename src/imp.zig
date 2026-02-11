@@ -61,7 +61,7 @@ const AExp = union(enum) {
                 try op.render(sink, parent_op);
             },
             .hole => {
-                try sink.append("◆", 1);
+                try sink.appendHole();
             },
         }
 
@@ -191,7 +191,7 @@ const Id = union(enum) {
                 try sink.appendAscii(s);
             },
             .hole => {
-                try sink.append("◆", 1);
+                try sink.appendHole();
             },
         }
 
@@ -348,7 +348,7 @@ const Com = union(enum) {
                 try sink.appendAscii("end");
             },
             .hole => {
-                try sink.append("◆", 1);
+                try sink.appendHole();
             },
         }
 
@@ -748,7 +748,7 @@ const BExp = union(enum) {
                 try op.render(sink, parent_op);
             },
             .hole => {
-                try sink.append("◆", 1);
+                try sink.appendHole();
             },
         }
 

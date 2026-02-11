@@ -31,7 +31,7 @@ pub const Sink = struct {
         }
     }
 
-    pub fn append(self: *Self, s: []const u8, n_code_points: usize) Error!void {
+    fn append(self: *Self, s: []const u8, n_code_points: usize) Error!void {
         try self.buf.appendSlice(cator, s);
         self.code_point_counter += n_code_points;
     }
@@ -62,5 +62,9 @@ pub const Sink = struct {
             self.buf.appendAssumeCapacity(' ');
         }
         self.code_point_counter += n + 1;
+    }
+
+    pub fn appendHole(self: *Self) !void {
+        try self.append("◆", 1);
     }
 };
