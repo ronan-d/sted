@@ -4,6 +4,8 @@ const Error = std.mem.Allocator.Error;
 
 const Sink = @import("render.zig").Sink;
 
+const Offer = @import("Tree.zig").Offer;
+
 pub fn Operation(
     OperandType: type,
     OperatorType: type,
@@ -11,6 +13,7 @@ pub fn Operation(
     return struct {
         operator: OperatorType,
         operands: std.ArrayList(OperandType),
+        offers: []const Offer,
 
         const Self = @This();
 
@@ -53,12 +56,12 @@ pub fn Operation(
             }
         }
 
-        pub fn make_initial_value(operator: OperatorType, hole: OperandType) !Self {
+        pub fn make_initial_value(operator: OperatorType, hole: OperandType, offers: []const Offer) !Self {
             var operands = try std.ArrayList(OperandType).initCapacity(cator, 2);
             operands.appendAssumeCapacity(hole);
             operands.appendAssumeCapacity(hole);
 
-            return Self{ .operator = operator, .operands = operands };
+            return Self{ .operator = operator, .operands = operands, .offers = offers };
         }
 
         pub fn childAt(self: Self, i: usize) *OperandType {

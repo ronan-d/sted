@@ -56,6 +56,14 @@ pub const StedWindow = extern struct {
         text_view.as(gtk.TextView).setCursorVisible(0);
         text_view.as(gtk.TextView).setMonospace(1);
 
+        {
+            const provider = gtk.CssProvider.new();
+            defer provider.unref();
+
+            provider.loadFromString("textview { font-family: \"Noto Mono\"; font-size: 12pt; }");
+            text_view.as(gtk.Widget).getStyleContext().addProvider(provider.as(gtk.StyleProvider), gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+        }
+
         const toolbar_view = adw.ToolbarView.new();
 
         toolbar_view.addTopBar(adw.HeaderBar.new().as(gtk.Widget));

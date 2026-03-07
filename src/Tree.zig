@@ -4,6 +4,7 @@ const Error = Allocator.Error;
 
 ptr: *anyopaque,
 vtable: *const VTable,
+replacement_offers: []const Offer,
 
 const Sink = @import("render.zig").Sink;
 
@@ -16,9 +17,7 @@ pub const VTable = struct {
 
     removeAt: *const fn (*anyopaque, i: usize) RemovalOutcome,
 
-    render: ?*const fn (*anyopaque, sink: *Sink) Allocator.Error!void = null,
-
-    replacement_offers: []const Offer,
+    render: *const fn (*anyopaque, sink: *Sink) Allocator.Error!void,
 };
 
 const Self = @This();
@@ -48,9 +47,7 @@ pub fn removeAt(self: *Self, i: usize) RemovalOutcome {
 }
 
 pub fn render(self: *Self, sink: *Sink) Allocator.Error!void {
-    if (self.vtable.render) |f| {
-        return f(self.ptr, sink);
-    }
+    return self.vtable.render(self.ptr, sink);
 }
 
 pub const Rewriter = union(enum) {
@@ -65,7 +62,7 @@ pub const Offer = struct {
 };
 
 pub fn getOffers(self: *const Self) []const Offer {
-    return self.vtable.replacement_offers;
+    return self.replacement_offers;
 }
 
 pub fn eq(a: Self, b: Self) bool {

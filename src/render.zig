@@ -5,11 +5,9 @@ const Buffer = std.ArrayList(u8);
 const cator = std.heap.c_allocator;
 const Error = std.mem.Allocator.Error;
 
-const Tree = @import("Tree.zig");
-
 pub const Sink = struct {
     buf: Buffer,
-    cursor: Tree,
+    cursor: *anyopaque,
     cursor_start: usize,
     cursor_end: usize,
     code_point_counter: usize,
@@ -19,14 +17,14 @@ pub const Sink = struct {
 
     const Self = @This();
 
-    pub fn startNode(self: *Self, node: Tree) void {
-        if (self.cursor.eq(node)) {
+    pub fn startNode(self: *Self, node: *anyopaque) void {
+        if (self.cursor == node) {
             self.cursor_start = self.code_point_counter;
         }
     }
 
-    pub fn endNode(self: *Self, node: Tree) void {
-        if (self.cursor.eq(node)) {
+    pub fn endNode(self: *Self, node: *anyopaque) void {
+        if (self.cursor == node) {
             self.cursor_end = self.code_point_counter;
         }
     }

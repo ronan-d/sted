@@ -2,8 +2,6 @@ const std = @import("std");
 
 const cator = std.heap.c_allocator;
 
-const imp = @import("imp.zig");
-
 const Tree = @import("Tree.zig");
 
 const Sink = @import("render.zig").Sink;
@@ -20,7 +18,7 @@ pub const Srcprg = struct {
     pub fn render(self: *Self) !Frame {
         self.sink.clear();
 
-        self.sink.cursor = self.cursor.cursor_pos;
+        self.sink.cursor = self.cursor.cursor_pos.ptr;
         try self.tree.render(&self.sink);
 
         try self.sink.buf.append(cator, 0);
@@ -33,7 +31,8 @@ pub const Srcprg = struct {
     }
 
     pub fn new() !Self {
-        const x = try imp.create_sample();
+        const x = try @import("zig.zig").get_sample();
+
         return Self{
             .tree = x,
             .cursor = blk: {
@@ -54,7 +53,7 @@ pub const Srcprg = struct {
                 .buf = .{},
                 .cursor_start = undefined,
                 .cursor_end = undefined,
-                .cursor = x,
+                .cursor = x.ptr,
                 .code_point_counter = 0,
                 .indentation_level = 0,
             },
