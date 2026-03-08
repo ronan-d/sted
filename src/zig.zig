@@ -343,15 +343,23 @@ const ArgList = lists.List(Node, "(", ")", .{ .symbol = ", " });
 const ParamList = lists.List(Node, "(", ")", .{ .symbol = ", " });
 
 pub fn get_sample() Error!Tree {
-    var dot_chain = try std.ArrayList(Node).initCapacity(cator, 5);
-    dot_chain.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "std") });
-    dot_chain.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "fs") });
-    dot_chain.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "File") });
+    const dot_chain0 = blk: {
+        var x = try std.ArrayList(Node).initCapacity(cator, 4);
+
+        x.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "std") });
+        x.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "fs") });
+        x.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "File") });
+        x.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "stdout") });
+
+        break :blk Node{ .op = .{ .operator = .dot, .operands = x, .offers = subtypes.expr } };
+    };
+
+    var dot_chain = try std.ArrayList(Node).initCapacity(cator, 2);
 
     {
         const p = try cator.create(Call);
         p.* = .{
-            .function = Node{ .identifier = try cator.dupe(u8, "stdout") },
+            .function = dot_chain0,
             .args = Node{ .arg_list = ArgList.initialValue() },
         };
 
