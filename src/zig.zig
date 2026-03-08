@@ -418,7 +418,7 @@ pub fn get_sample() Error!Tree {
     const ret = try cator.create(Node);
     ret.* = Node{ .fn_decl = fnd };
 
-    return ret.to_tree(subtypes.stmt);
+    return ret.to_tree(subtypes.decl);
 }
 
 const atoms = struct {
@@ -575,7 +575,11 @@ const atoms = struct {
 
     fn mkFnDecl() Error!Node {
         const p = try cator.create(FnProto);
-        p.* = FnProto{ .identifier = .hole, .param_list = ParamList.initialValue() };
+        p.* = FnProto{
+            .identifier = .hole,
+            .param_list = Node{ .param_list = ParamList.initialValue() },
+            .return_type = .hole,
+        };
 
         const p0 = try cator.create(FnDecl);
         p0.* = FnDecl{ .proto = Node{ .fn_proto = p }, .body = Node{ .block = Block.initialValue() } };
@@ -620,6 +624,10 @@ const subtypes = struct {
 
     const right_of_dot: Subtype = &[_]Offer{
         atoms.identifier,
+    };
+
+    const decl: Subtype = &[_]Offer{
+        atoms.fn_decl,
     };
 
     // One possible value, so no choice to make and therefore an empty array.
