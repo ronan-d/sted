@@ -101,8 +101,9 @@ pub const StedWindow = extern struct {
             .buffer = buffer,
             .tag = buffer.createTag(
                 "cursor-tag",
-                "underline",
-                @intFromEnum(pango.Underline.single),
+                "background",
+                // This is from Helix's "dark_plus" theme, which probably comes from VS Code.
+                "#3a3d41",
                 last_arg,
             ),
         };
