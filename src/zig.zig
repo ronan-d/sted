@@ -382,7 +382,10 @@ pub fn get_sample() Error!Tree {
     const call_node = try cator.create(Node);
     call_node.* = Node{ .call = call };
 
-    const s = Node{ .try_expr = call_node };
+    const te = try cator.create(Node);
+    te.* = Node{ .try_expr = call_node };
+
+    const s = Node{ .expr_stmt = te };
 
     var b = Block.initialValue();
 
