@@ -58,7 +58,9 @@ pub const StedWindow = extern struct {
             const provider = gtk.CssProvider.new();
             defer provider.unref();
 
-            provider.loadFromString("textview { font-family: \"Noto Mono\"; font-size: 12pt; }");
+            const style_string = @embedFile("style.css");
+
+            provider.loadFromString(style_string);
             text_view.as(gtk.Widget).getStyleContext().addProvider(provider.as(gtk.StyleProvider), gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
         }
 
