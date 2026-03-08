@@ -41,12 +41,6 @@ pub const Srcprg = struct {
 
                 p.start();
 
-                p.perform(.go_down);
-                p.perform(.go_down);
-                p.perform(.go_right);
-                p.perform(.go_down);
-                p.perform(.go_right);
-
                 break :blk p;
             },
             .sink = Sink{
