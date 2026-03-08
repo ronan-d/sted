@@ -1,22 +1,20 @@
 const std = @import("std");
 const cator = std.heap.c_allocator;
-
 const Allocator = std.mem.Allocator;
 
 const adw = @import("adw");
+const gdk = @import("gdk");
+const gio = @import("gio");
 const glib = @import("glib");
 const gobject = @import("gobject");
-const gio = @import("gio");
 const gtk = @import("gtk");
-const sourceview = @import("gtksourceview");
 const pango = @import("pango");
-
-const StedApp = @import("stedapp.zig").StedApp;
+const sourceview = @import("gtksourceview");
 
 const Frame = @import("Frame.zig");
-
+const instruction = @import("ThreadCursor.zig").instruction;
 const Srcprg = @import("srcprg.zig").Srcprg;
-
+const StedApp = @import("stedapp.zig").StedApp;
 const Tree = @import("Tree.zig");
 
 const Renderer = extern struct {
@@ -44,6 +42,7 @@ pub const StedWindow = extern struct {
     parent_instance: Parent,
     renderer: Renderer,
     srcprg: *Srcprg,
+    controller: *gtk.ShortcutController,
 
     pub const Parent = adw.ApplicationWindow;
 
@@ -63,6 +62,27 @@ pub const StedWindow = extern struct {
             provider.loadFromString("textview { font-family: \"Noto Mono\"; font-size: 12pt; }");
             text_view.as(gtk.Widget).getStyleContext().addProvider(provider.as(gtk.StyleProvider), gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
         }
+
+        {
+            const controller = gtk.ShortcutController.new();
+            controller.as(gtk.EventController).setPropagationPhase(gtk.PropagationPhase.bubble);
+
+            self.as(gtk.Widget).addController(controller.as(gtk.EventController));
+
+            self.controller = controller;
+        }
+
+        self.bind_instruction_to_key(.go_right, gdk.KEY_l);
+        self.bind_instruction_to_key(.go_up, gdk.KEY_k);
+        self.bind_instruction_to_key(.go_left, gdk.KEY_h);
+        self.bind_instruction_to_key(.go_down, gdk.KEY_j);
+
+        self.bind_instruction_to_key(.insert_before, gdk.KEY_s);
+        self.bind_instruction_to_key(.insert_after, gdk.KEY_d);
+
+        self.bind_instruction_to_key(.remove_cursor_node, gdk.KEY_r);
+
+        self.bind_cb_to_key(replace, gdk.KEY_o);
 
         const toolbar_view = adw.ToolbarView.new();
 
@@ -97,6 +117,47 @@ pub const StedWindow = extern struct {
 
         const frame = self.srcprg.render() catch unreachable;
         self.renderer.render_frame(frame);
+    }
+
+    fn bind_cb_to_key(win: *StedWindow, cb: fn (*StedWindow) void, keycode: c_uint) void {
+        // TODO perhaps adding some sort of name to the action will be needed for
+        // display later.
+
+        const trigger = gtk.KeyvalTrigger.new(keycode, .{});
+
+        const cb_action = blk: {
+            const local_module = struct {
+                fn gtk_cb(wid: *gtk.Widget, _: ?*glib.Variant, _: ?*anyopaque) callconv(.c) c_int {
+                    const self: *StedWindow = gobject.ext.cast(StedWindow, wid).?;
+
+                    cb(self);
+
+                    return 1;
+                }
+            };
+
+            const scf: gtk.ShortcutFunc = local_module.gtk_cb;
+
+            const cba = gtk.CallbackAction.new(scf, null, null);
+
+            break :blk cba;
+        };
+
+        const shortcut = gtk.Shortcut.new(trigger.as(gtk.ShortcutTrigger), cb_action.as(gtk.ShortcutAction));
+
+        win.controller.addShortcut(shortcut);
+    }
+
+    fn bind_instruction_to_key(win: *StedWindow, comptime instr: instruction, keycode: c_uint) void {
+        const local_module = struct {
+            fn cb(self: *StedWindow) void {
+                self.srcprg.cursor.perform(instr);
+
+                self.refresh() catch unreachable;
+            }
+        };
+
+        win.bind_cb_to_key(local_module.cb, keycode);
     }
 
     fn dispose(self: *StedWindow) callconv(.c) void {

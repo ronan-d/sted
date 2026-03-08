@@ -1,4 +1,4 @@
 - Source view theme.
-- Fix identifier input (on Ubuntu 24.04 only?).
+- Check that identifier input works on Ubuntu 24.04.
 - Check for memory leaks.
 - Improve cursor display for single-statement list.
