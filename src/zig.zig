@@ -192,7 +192,10 @@ const Node = union(enum) {
                 else => unreachable,
             },
             .arg_list => |x| x.elements.items[i].to_tree(subtypes.expr),
-            .op => |x| x.operands.items[i].to_tree(x.offers),
+            .op => |x| x.operands.items[i].to_tree(if (x.operator == .dot and i > 0)
+                subtypes.right_of_dot
+            else
+                x.offers),
             .str_lit => unreachable,
             .try_expr => |e| switch (i) {
                 0 => e.to_tree(subtypes.expr),
@@ -612,6 +615,10 @@ const subtypes = struct {
     };
 
     const type_expr: Subtype = &[_]Offer{
+        atoms.identifier,
+    };
+
+    const right_of_dot: Subtype = &[_]Offer{
         atoms.identifier,
     };
 
