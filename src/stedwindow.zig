@@ -108,8 +108,7 @@ pub const StedWindow = extern struct {
         self.srcprg = cator.create(Srcprg) catch unreachable;
         self.srcprg.* = Srcprg.new() catch unreachable;
 
-        const frame = self.srcprg.render() catch unreachable;
-        self.renderer.render_frame(frame);
+        self.refresh() catch unreachable;
     }
 
     fn bind_cb_to_key(win: *StedWindow, cb: fn (*StedWindow) void, keycode: c_uint) void {
