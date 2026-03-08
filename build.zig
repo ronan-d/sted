@@ -38,7 +38,6 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "gdk", .module = gobject.module("gdk4") },
                 .{ .name = "gtk", .module = gobject.module("gtk4") },
                 .{ .name = "adw", .module = gobject.module("adw1") },
-                .{ .name = "gtksourceview", .module = gobject.module("gtksource5") },
             },
         }),
     });

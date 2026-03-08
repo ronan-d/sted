@@ -9,7 +9,6 @@ const glib = @import("glib");
 const gobject = @import("gobject");
 const gtk = @import("gtk");
 const pango = @import("pango");
-const sourceview = @import("gtksourceview");
 
 const Frame = @import("Frame.zig");
 const instruction = @import("ThreadCursor.zig").instruction;
@@ -50,10 +49,10 @@ pub const StedWindow = extern struct {
         self.as(gtk.Window).setTitle("hello");
         self.as(gtk.Window).setDefaultSize(800, 800);
 
-        const text_view = sourceview.View.new();
-        text_view.as(gtk.TextView).setEditable(0);
-        text_view.as(gtk.TextView).setCursorVisible(0);
-        text_view.as(gtk.TextView).setMonospace(1);
+        const text_view = gtk.TextView.new();
+        text_view.setEditable(0);
+        text_view.setCursorVisible(0);
+        text_view.setMonospace(1);
 
         {
             const provider = gtk.CssProvider.new();
@@ -94,13 +93,7 @@ pub const StedWindow = extern struct {
 
         const last_arg: ?*anyopaque = null;
 
-        const buffer = text_view.as(gtk.TextView).getBuffer();
-
-        {
-            const source_buffer = gobject.ext.cast(sourceview.Buffer, buffer).?;
-
-            source_buffer.setHighlightMatchingBrackets(0);
-        }
+        const buffer = text_view.getBuffer();
 
         self.renderer = Renderer{
             .buffer = buffer,
