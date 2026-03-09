@@ -19,6 +19,7 @@ pub const instruction = union(enum) {
     go_down,
     insert_before,
     insert_after,
+    insert_inside,
     remove_cursor_node,
 };
 
@@ -160,6 +161,55 @@ fn traverse_dynamically(
                                     .replaced => break,
                                 }
                             },
+                        }
+                    }
+                }
+            },
+            .insert_inside => {
+                if (node.childCount() == 0) {
+                    if (try node.insertAt(0)) {
+                        var i: usize = 0;
+
+                        while (true) {
+                            const up_instr = try self.traverse_dynamically(
+                                node.childAt(i),
+                                .go_down,
+                            );
+
+                            switch (up_instr) {
+                                .go_left => {
+                                    if (0 < i) {
+                                        i -= 1;
+                                    }
+                                },
+                                .go_right => {
+                                    if (i + 1 < node.childCount()) {
+                                        i += 1;
+                                    }
+                                },
+                                .do_nothing => {
+                                    break;
+                                },
+                                .insert_before => {
+                                    _ = try node.insertAt(i);
+                                },
+                                .insert_after => {
+                                    if (try node.insertAt(i + 1)) {
+                                        i += 1;
+                                    }
+                                },
+                                .remove_cursor_node => {
+                                    switch (node.removeAt(i)) {
+                                        .done => {
+                                            if (i == node.childCount()) {
+                                                i = i - 1;
+                                            }
+                                        },
+                                        .not_possible => {},
+                                        .replaced => break,
+                                    }
+                                },
+                            }
                         }
                     }
                 }
