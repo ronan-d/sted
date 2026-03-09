@@ -19,6 +19,7 @@ pub const instruction = union(enum) {
     go_down,
     insert_before,
     insert_after,
+    insert_inside,
     remove_cursor_node,
 };
 
@@ -162,6 +163,11 @@ fn traverse_dynamically(
                             },
                         }
                     }
+                }
+            },
+            .insert_inside => {
+                if (node.childCount() == 0) {
+                    _ = try node.insertAt(0);
                 }
             },
             .insert_before => return .insert_before,

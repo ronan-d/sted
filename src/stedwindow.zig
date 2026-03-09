@@ -80,6 +80,7 @@ pub const StedWindow = extern struct {
 
         self.bind_instruction_to_key(.insert_before, gdk.KEY_s);
         self.bind_instruction_to_key(.insert_after, gdk.KEY_d);
+        self.bind_instruction_to_key(.insert_inside, gdk.KEY_i);
 
         self.bind_instruction_to_key(.remove_cursor_node, gdk.KEY_r);
 
