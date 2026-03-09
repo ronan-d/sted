@@ -3,8 +3,6 @@ const cator = std.heap.c_allocator;
 const Error = std.mem.Allocator.Error;
 
 const Tree = @import("Tree.zig");
-const VTable = Tree.VTable;
-const Offer = Tree.Offer;
 
 const Sink = @import("render.zig").Sink;
 
