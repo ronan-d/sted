@@ -17,12 +17,14 @@ pub const VTable = struct {
 
     removeAt: *const fn (*anyopaque, i: usize) RemovalOutcome,
 
+    getMask: *const fn (*anyopaque) Mask,
+
     render: *const fn (*anyopaque, sink: *Sink) Allocator.Error!void,
 };
 
 const Self = @This();
 
-pub fn childCount(self: *Self) usize {
+pub fn childCount(self: Self) usize {
     return self.vtable.childCount(self.ptr);
 }
 
@@ -44,6 +46,10 @@ pub const RemovalOutcome = union(enum) {
 
 pub fn removeAt(self: *Self, i: usize) RemovalOutcome {
     return self.vtable.removeAt(self.ptr, i);
+}
+
+pub fn getMask(self: Self) Mask {
+    return self.vtable.getMask(self.ptr);
 }
 
 pub fn render(self: *Self, sink: *Sink) Allocator.Error!void {
@@ -68,3 +74,8 @@ pub fn getOffers(self: *const Self) []const Offer {
 pub fn eq(a: Self, b: Self) bool {
     return a.ptr == b.ptr and a.vtable == b.vtable;
 }
+
+pub const Mask = struct {
+    insert_at: bool,
+    remove_at: bool,
+};

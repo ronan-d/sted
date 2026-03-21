@@ -292,6 +292,27 @@ const Node = union(enum) {
         };
     }
 
+    fn getMask(self: Self) Tree.Mask {
+        return switch (self) {
+            .hole,
+            .identifier,
+            .call,
+            .str_lit,
+            .try_expr,
+            .expr_stmt,
+            .fn_proto,
+            .param_decl,
+            .any_type,
+            .fn_decl,
+            => Tree.Mask{ .insert_at = false, .remove_at = false },
+            .arg_list,
+            .op,
+            .block,
+            .param_list,
+            => Tree.Mask{ .insert_at = true, .remove_at = true },
+        };
+    }
+
     fn opaqueChildCount(ptr: *anyopaque) usize {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
@@ -322,11 +343,18 @@ const Node = union(enum) {
         return self.render(sink, null);
     }
 
+    fn opaqueGetMask(ptr: *anyopaque) Tree.Mask {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        return self.getMask();
+    }
+
     const vtable = VTable{
         .childCount = opaqueChildCount,
         .childAt = opaqueChildAt,
         .insertAt = opaqueInsertAt,
         .removeAt = opaqueRemoveAt,
+        .getMask = opaqueGetMask,
         .render = opaqueRender,
     };
 

@@ -1,18 +1,20 @@
 const std = @import("std");
-
 const th = std.Thread;
 
 const Tree = @import("Tree.zig");
+const commands = @import("commands.zig");
+const Command = commands.Command;
 
 mutex: th.Mutex,
 cond: th.Condition,
-pending_instruction: ?instruction,
+pending_command: ?Command,
 root: Tree,
 cursor_pos: Tree,
+mask: Mask,
 
 const Self = @This();
 
-pub const instruction = union(enum) {
+pub const instruction = enum {
     go_right,
     go_up,
     go_left,
@@ -23,38 +25,39 @@ pub const instruction = union(enum) {
     remove_cursor_node,
 };
 
-pub fn perform(self: *Self, instr: instruction) void {
+pub fn perform(self: *Self, command: Command) void {
     self.mutex.lock();
     defer self.mutex.unlock();
 
-    self.pending_instruction = instr;
+    self.pending_command = command;
     self.cond.signal();
 
     while (true) {
         self.cond.wait(&self.mutex);
 
-        if (self.pending_instruction == null) {
+        if (self.pending_command == null) {
             break;
         }
     }
 }
 
-fn receive(self: *Self) instruction {
+fn receive(self: *Self) Command {
     self.mutex.lock();
     // We won't unlock the mutex before returning since it's all synchronous.
 
     while (true) {
-        if (self.pending_instruction) |instr| {
-            return instr;
+        if (self.pending_command) |c| {
+            return c;
         } else {
             self.cond.wait(&self.mutex);
         }
     }
 }
 
-fn report_completion(self: *Self, cursor_pos: Tree) void {
-    self.pending_instruction = null;
+fn report_completion(self: *Self, cursor_pos: Tree, am: AboveMask) void {
+    self.pending_command = null;
     self.cursor_pos = cursor_pos;
+    self.mask = mergeMasks(am, cursor_pos);
     self.cond.signal();
     self.mutex.unlock();
 }
@@ -63,9 +66,10 @@ pub fn init(root: Tree) Self {
     return Self{
         .mutex = .{},
         .cond = .{},
-        .pending_instruction = null,
+        .pending_command = .go_down,
         .root = root,
         .cursor_pos = root,
+        .mask = undefined,
     };
 }
 
@@ -81,52 +85,71 @@ const up_instruction = enum {
     remove_cursor_node,
 };
 
-const down_instruction = enum {
-    none,
-    go_down,
-};
-
 pub fn start(self: *Self) void {
     _ = th.spawn(.{}, thread_main, .{self}) catch std.process.exit(1);
+
+    self.mutex.lock();
+
+    while (true) {
+        if (self.pending_command == null) {
+            self.mutex.unlock();
+            return;
+        }
+
+        self.cond.wait(&self.mutex);
+    }
 }
 
 fn thread_main(self: *Self) void {
-    while (true) {
-        _ = self.traverse_dynamically(self.root, .none) catch std.process.exit(1);
-        self.report_completion(self.root);
-    }
+    const am = AboveMask{
+        .go_right = false,
+        .go_up = false,
+        .go_left = false,
+        .insert_before = false,
+        .insert_after = false,
+        .remove_cursor_node = false,
+    };
+    self.mutex.lock();
+    _ = self.traverse_dynamically(self.root, am) catch std.process.exit(1);
+
+    // If our command masks are right, we should never get here.
+    unreachable;
 }
 
 fn traverse_dynamically(
     self: *Self,
     node_on_entry: Tree,
-    down_instr: down_instruction,
+    above_mask: AboveMask,
 ) !up_instruction {
-    switch (down_instr) {
-        .none => {},
-        .go_down => {
-            self.report_completion(node_on_entry);
-        },
-    }
+    self.report_completion(node_on_entry, above_mask);
 
     var node = node_on_entry;
 
     while (true) {
         const instr = self.receive();
+        const n = node.childCount();
 
         switch (instr) {
             .go_right => return .go_right,
             .go_up => return .do_nothing,
             .go_left => return .go_left,
             .go_down => {
-                if (0 < node.childCount()) {
+                if (0 < n) {
                     var i: usize = 0;
 
                     while (true) {
-                        const up_instr = try self.traverse_dynamically(
-                            node.childAt(i),
-                            .go_down,
-                        );
+                        const m = node.getMask();
+
+                        const am = AboveMask{
+                            .go_right = i + 1 < n,
+                            .go_up = true,
+                            .go_left = 0 < i,
+                            .insert_before = m.insert_at,
+                            .insert_after = m.insert_at,
+                            .remove_cursor_node = m.remove_at,
+                        };
+
+                        const up_instr = try self.traverse_dynamically(node.childAt(i), am);
 
                         switch (up_instr) {
                             .go_left => {
@@ -135,7 +158,7 @@ fn traverse_dynamically(
                                 }
                             },
                             .go_right => {
-                                if (i + 1 < node.childCount()) {
+                                if (i + 1 < n) {
                                     i += 1;
                                 }
                             },
@@ -153,7 +176,7 @@ fn traverse_dynamically(
                             .remove_cursor_node => {
                                 switch (node.removeAt(i)) {
                                     .done => {
-                                        if (i == node.childCount()) {
+                                        if (i == n) {
                                             i = i - 1;
                                         }
                                     },
@@ -166,15 +189,49 @@ fn traverse_dynamically(
                 }
             },
             .insert_inside => {
-                if (node.childCount() == 0) {
+                if (n == 0) {
                     _ = try node.insertAt(0);
                 }
             },
             .insert_before => return .insert_before,
             .insert_after => return .insert_after,
-            .remove_cursor_node => return .remove_cursor_node,
+            .remove => return .remove_cursor_node,
+            .replace => unreachable,
         }
 
-        self.report_completion(node);
+        self.report_completion(node, above_mask);
     }
+}
+
+pub const Mask = commands.Map(bool);
+
+// The part of the command mask for which we need to look at the parent of the
+// node that's under the cursor, and not the node itself. "Above" because the
+// values of the fields come from the parent, which is above.
+const AboveMask = struct {
+    go_right: bool,
+    go_up: bool,
+    go_left: bool,
+    insert_before: bool,
+    insert_after: bool,
+    remove_cursor_node: bool,
+};
+
+fn mergeMasks(am: AboveMask, node: Tree) Mask {
+    const offers = node.replacement_offers;
+    const is_replacing_useless = offers.len == 0 or offers.len == 1 and offers[0].rewriter == .from_void;
+
+    var ret: Mask = undefined;
+
+    ret.at_mut(.go_right).* = am.go_right;
+    ret.at_mut(.go_up).* = am.go_up;
+    ret.at_mut(.go_left).* = am.go_left;
+    ret.at_mut(.go_down).* = 0 < node.childCount();
+    ret.at_mut(.insert_before).* = am.insert_before;
+    ret.at_mut(.insert_after).* = am.insert_after;
+    ret.at_mut(.insert_inside).* = node.getMask().insert_at and node.childCount() == 0;
+    ret.at_mut(.remove).* = am.remove_cursor_node;
+    ret.at_mut(.replace).* = !is_replacing_useless;
+
+    return ret;
 }
