@@ -6,6 +6,8 @@
 //    b. A shortcut key (with the right GDK type).
 // 3. Elements can be either a ThreadCursor instruction or an arbitrary StedWindow method.
 
+const std = @import("std");
+
 pub const Command = enum {
     go_right,
     go_up,
@@ -48,24 +50,12 @@ pub const Command = enum {
     }
 };
 
-const command_count = switch (@typeInfo(Command)) {
-    .@"enum" => |e| e.fields.len,
-    else => unreachable,
-};
-
-pub const all_commands = blk: {
-    var x: [command_count]Command = undefined;
-
-    for (&x, 0..) |*p, i| {
-        p.* = @enumFromInt(i);
-    }
-
-    break :blk x;
-};
+pub const all_commands = std.enums.values(Command);
 
 pub fn Map(T: type) type {
+    // Note: std.enums.EnumArray would be nice here, but we need the "extern".
     return extern struct {
-        array: [command_count]T,
+        array: [all_commands.len]T,
 
         pub fn at(self: @This(), c: Command) T {
             return self.array[@intFromEnum(c)];
