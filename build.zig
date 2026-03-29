@@ -6,6 +6,8 @@ pub fn build(b: *std.Build) void {
 
     const gobject = b.dependency("gobject", .{});
 
+    const use_llvm = b.option(bool, "use-llvm", "Use the llvm backend");
+
     const main = b.addExecutable(.{
         .name = "sted",
         .root_module = b.createModule(.{
@@ -31,6 +33,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "adw", .module = gobject.module("adw1") },
             },
         }),
+        .use_llvm = use_llvm,
     });
 
     b.installArtifact(main);
