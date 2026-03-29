@@ -50,7 +50,7 @@ pub const StedWindow = extern struct {
     pub const Parent = adw.ApplicationWindow;
 
     fn init(self: *StedWindow, _: *Class) callconv(.c) void {
-        self.as(gtk.Window).setTitle("hello");
+        self.as(gtk.Window).setTitle("Sted");
 
         const text_view = gtk.TextView.new();
         text_view.setEditable(0);
