@@ -200,7 +200,9 @@ pub const StedWindow = extern struct {
         return gobject.ext.as(T, app);
     }
 
-    pub const getGObjectType = gobject.ext.defineClass(StedWindow, .{ .instanceInit = &init });
+    pub const getGObjectType = gobject.ext.defineClass(StedWindow, .{
+        .instanceInit = &init,
+    });
 
     pub const Class = extern struct {
         parent_class: Parent.Class,

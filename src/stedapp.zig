@@ -33,7 +33,7 @@ pub const StedApp = extern struct {
         fn activateImpl(app: *StedApp) callconv(.c) void {
             const win = StedWindow.new(app);
 
-            gtk.Window.present(win.as(gtk.Window));
+            win.as(gtk.Window).present();
         }
 
         fn init(class: *Class) callconv(.c) void {
