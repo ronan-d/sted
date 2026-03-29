@@ -4,15 +4,6 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const srcprg = b.createModule(.{
-        .root_source_file = b.path("src/srcprg.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-    });
-
-    srcprg.addIncludePath(b.path("."));
-
     const gobject = b.dependency("gobject", .{});
 
     const main = b.addExecutable(.{
