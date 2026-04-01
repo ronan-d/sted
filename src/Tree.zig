@@ -20,6 +20,8 @@ pub const VTable = struct {
     getMask: *const fn (*anyopaque) Mask,
 
     render: *const fn (*anyopaque, sink: *Sink) Allocator.Error!void,
+
+    deinit: *const fn (*anyopaque) void,
 };
 
 const Self = @This();
@@ -54,6 +56,10 @@ pub fn getMask(self: Self) Mask {
 
 pub fn render(self: *Self, sink: *Sink) Allocator.Error!void {
     return self.vtable.render(self.ptr, sink);
+}
+
+pub fn deinit(self: *Self) void {
+    self.vtable.deinit(self.ptr);
 }
 
 pub const Rewriter = union(enum) {

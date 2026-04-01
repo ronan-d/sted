@@ -337,16 +337,23 @@ const Node = union(enum) {
         return self.removeAt(i);
     }
 
+    fn opaqueGetMask(ptr: *anyopaque) Tree.Mask {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        return self.getMask();
+    }
+
     fn opaqueRender(ptr: *anyopaque, sink: *Sink) Error!void {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
         return self.render(sink, null);
     }
 
-    fn opaqueGetMask(ptr: *anyopaque) Tree.Mask {
+    fn opaqueDeinit(ptr: *anyopaque) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
-        return self.getMask();
+        self.drop();
+        cator.destroy(self);
     }
 
     const vtable = VTable{
@@ -355,6 +362,7 @@ const Node = union(enum) {
         .insertAt = opaqueInsertAt,
         .removeAt = opaqueRemoveAt,
         .getMask = opaqueGetMask,
+        .deinit = opaqueDeinit,
         .render = opaqueRender,
     };
 

@@ -8,9 +8,11 @@ const Command = commands.Command;
 mutex: th.Mutex,
 cond: th.Condition,
 pending_command: ?Command,
+must_exit: bool,
 root: Tree,
 cursor_pos: Tree,
-mask: Mask,
+amask: AboveMask,
+thread: std.Thread,
 
 const Self = @This();
 
@@ -41,12 +43,18 @@ pub fn perform(self: *Self, command: Command) void {
     }
 }
 
-fn receive(self: *Self) Command {
+pub fn getMask(self: *Self) Mask {
+    return mergeMasks(self.amask, self.cursor_pos);
+}
+
+fn receive(self: *Self) ?Command {
     self.mutex.lock();
     // We won't unlock the mutex before returning since it's all synchronous.
 
     while (true) {
-        if (self.pending_command) |c| {
+        if (self.must_exit) {
+            return null;
+        } else if (self.pending_command) |c| {
             return c;
         } else {
             self.cond.wait(&self.mutex);
@@ -57,7 +65,7 @@ fn receive(self: *Self) Command {
 fn report_completion(self: *Self, cursor_pos: Tree, am: AboveMask) void {
     self.pending_command = null;
     self.cursor_pos = cursor_pos;
-    self.mask = mergeMasks(am, cursor_pos);
+    self.amask = am;
     self.cond.signal();
     self.mutex.unlock();
 }
@@ -67,9 +75,11 @@ pub fn init(root: Tree) Self {
         .mutex = .{},
         .cond = .{},
         .pending_command = .go_down,
+        .must_exit = false,
         .root = root,
         .cursor_pos = root,
-        .mask = undefined,
+        .amask = undefined,
+        .thread = undefined,
     };
 }
 
@@ -83,10 +93,11 @@ const up_instruction = enum {
     insert_before,
     insert_after,
     remove_cursor_node,
+    exit,
 };
 
 pub fn start(self: *Self) void {
-    _ = th.spawn(.{}, thread_main, .{self}) catch std.process.exit(1);
+    self.thread = th.spawn(.{}, thread_main, .{self}) catch std.process.exit(1);
 
     self.mutex.lock();
 
@@ -100,6 +111,14 @@ pub fn start(self: *Self) void {
     }
 }
 
+pub fn stop(self: *Self) void {
+    self.mutex.lock();
+    self.must_exit = true;
+    self.cond.signal();
+    self.mutex.unlock();
+    self.thread.join();
+}
+
 fn thread_main(self: *Self) void {
     const am = AboveMask{
         .go_right = false,
@@ -110,10 +129,10 @@ fn thread_main(self: *Self) void {
         .remove_cursor_node = false,
     };
     self.mutex.lock();
-    _ = self.traverse_dynamically(self.root, am) catch std.process.exit(1);
+    const i = self.traverse_dynamically(self.root, am) catch std.process.exit(1);
 
-    // If our command masks are right, we should never get here.
-    unreachable;
+    // If our command masks are right, we received up_instruction.exit.
+    std.debug.assert(i == .exit);
 }
 
 fn traverse_dynamically(
@@ -126,7 +145,7 @@ fn traverse_dynamically(
     var node = node_on_entry;
 
     while (true) {
-        const instr = self.receive();
+        const instr = if (self.receive()) |x| x else return .exit;
         const n = node.childCount();
 
         switch (instr) {
@@ -184,6 +203,7 @@ fn traverse_dynamically(
                                     .replaced => break,
                                 }
                             },
+                            .exit => return .exit,
                         }
                     }
                 }

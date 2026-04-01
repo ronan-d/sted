@@ -38,6 +38,8 @@ const Renderer = extern struct {
 
         self.buffer.applyTag(self.tag, &start, &end);
     }
+
+    fn deinit(_: *Self) void {}
 };
 
 pub const StedWindow = extern struct {
@@ -84,7 +86,7 @@ pub const StedWindow = extern struct {
 
             inline for (commands.all_commands) |c| {
                 const k = c.keycode();
-                const s = self.bind_command_to_key(c, k);
+                const s = if (local_method(c)) |m| self.bind_cb_to_key(m, k) else self.bind_command_to_key(c, k);
                 x.at_mut(c).* = Shortcut.fromGtkShortcut(s, c.displayText(), k);
             }
 
@@ -105,7 +107,6 @@ pub const StedWindow = extern struct {
 
             break :blk pane;
         };
-        _ = self.bind_cb_to_key(replace, gdk.KEY_o);
 
         text_view.as(gtk.Widget).setSizeRequest(
             4 * ui_layout.unit_in_pixels,
@@ -202,7 +203,20 @@ pub const StedWindow = extern struct {
 
     pub const getGObjectType = gobject.ext.defineClass(StedWindow, .{
         .instanceInit = &init,
+        .classInit = Class.init,
+        .parent_class = &Class.parent,
     });
+
+    fn finalizeImpl(win: *StedWindow) callconv(.c) void {
+        win.renderer.deinit();
+
+        win.srcprg.deinit();
+        cator.destroy(win.srcprg);
+
+        win.deinit();
+
+        gobject.Object.virtual_methods.finalize.call(Class.parent, win.as(Parent));
+    }
 
     pub const Class = extern struct {
         parent_class: Parent.Class,
@@ -210,6 +224,10 @@ pub const StedWindow = extern struct {
         var parent: *Parent.Class = undefined;
 
         pub const Instance = StedWindow;
+
+        fn init(class: *Class) callconv(.c) void {
+            gobject.Object.virtual_methods.finalize.implement(class, &finalizeImpl);
+        }
     };
 
     pub fn new(app: *StedApp) *StedWindow {
@@ -316,7 +334,7 @@ pub const StedWindow = extern struct {
     }
 
     pub fn refresh(self: *Self) !void {
-        const m = self.srcprg.cursor.mask;
+        const m = self.srcprg.cursor.getMask();
 
         for (commands.all_commands) |c| {
             const s = self.shortcut_pane.at_mut(c);
@@ -339,6 +357,13 @@ pub const StedWindow = extern struct {
         }
 
         self.renderer.render_frame(try self.srcprg.render());
+    }
+
+    pub fn deinit(self: *Self) void {
+        for (commands.all_commands) |c| {
+            const s = self.shortcut_pane.at_mut(c);
+            s.gtks.unref();
+        }
     }
 };
 
@@ -477,3 +502,10 @@ const Shortcut = extern struct {
 };
 
 const ShortcutPane = commands.Map(Shortcut);
+
+fn local_method(c: commands.Command) ?fn (*StedWindow) void {
+    return switch (c) {
+        .replace => StedWindow.replace,
+        else => null,
+    };
+}

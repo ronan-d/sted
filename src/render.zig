@@ -65,4 +65,8 @@ pub const Sink = struct {
     pub fn appendHole(self: *Self) !void {
         try self.append("◆", 1);
     }
+
+    pub fn deinit(self: *Self) void {
+        self.buf.deinit(cator);
+    }
 };

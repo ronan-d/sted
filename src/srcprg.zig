@@ -53,6 +53,13 @@ pub const Srcprg = struct {
             },
         };
     }
+
+    pub fn deinit(self: *Self) void {
+        self.tree.deinit();
+        self.sink.deinit();
+        self.cursor.stop();
+        cator.destroy(self.cursor);
+    }
 };
 
 const ThreadCursor = @import("ThreadCursor.zig");
