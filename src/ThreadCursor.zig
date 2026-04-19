@@ -1,12 +1,14 @@
 const std = @import("std");
 const th = std.Thread;
+const Io = std.Io;
+const Allocator = std.mem.Allocator;
 
 const Tree = @import("Tree.zig");
 const commands = @import("commands.zig");
 const Command = commands.Command;
 
-mutex: th.Mutex,
-cond: th.Condition,
+mutex: Io.Mutex,
+cond: Io.Condition,
 pending_command: ?Command,
 must_exit: bool,
 root: Tree,
@@ -27,15 +29,15 @@ pub const instruction = enum {
     remove_cursor_node,
 };
 
-pub fn perform(self: *Self, command: Command) void {
-    self.mutex.lock();
-    defer self.mutex.unlock();
+pub fn perform(self: *Self, io: Io, command: Command) !void {
+    try self.mutex.lock(io);
+    defer self.mutex.unlock(io);
 
     self.pending_command = command;
-    self.cond.signal();
+    self.cond.signal(io);
 
     while (true) {
-        self.cond.wait(&self.mutex);
+        try self.cond.wait(io, &self.mutex);
 
         if (self.pending_command == null) {
             break;
@@ -47,8 +49,8 @@ pub fn getMask(self: *Self) Mask {
     return mergeMasks(self.amask, self.cursor_pos);
 }
 
-fn receive(self: *Self) ?Command {
-    self.mutex.lock();
+fn receive(self: *Self, io: Io) !?Command {
+    try self.mutex.lock(io);
     // We won't unlock the mutex before returning since it's all synchronous.
 
     while (true) {
@@ -57,23 +59,23 @@ fn receive(self: *Self) ?Command {
         } else if (self.pending_command) |c| {
             return c;
         } else {
-            self.cond.wait(&self.mutex);
+            try self.cond.wait(io, &self.mutex);
         }
     }
 }
 
-fn report_completion(self: *Self, cursor_pos: Tree, am: AboveMask) void {
+fn report_completion(self: *Self, io: Io, cursor_pos: Tree, am: AboveMask) void {
     self.pending_command = null;
     self.cursor_pos = cursor_pos;
     self.amask = am;
-    self.cond.signal();
-    self.mutex.unlock();
+    self.cond.signal(io);
+    self.mutex.unlock(io);
 }
 
 pub fn init(root: Tree) Self {
     return Self{
-        .mutex = .{},
-        .cond = .{},
+        .mutex = .init,
+        .cond = .init,
         .pending_command = .go_down,
         .must_exit = false,
         .root = root,
@@ -96,30 +98,30 @@ const up_instruction = enum {
     exit,
 };
 
-pub fn start(self: *Self) void {
-    self.thread = th.spawn(.{}, thread_main, .{self}) catch std.process.exit(1);
+pub fn start(self: *Self, io: Io, gpa: Allocator) !void {
+    self.thread = th.spawn(.{}, thread_main, .{ self, io, gpa }) catch std.process.exit(1);
 
-    self.mutex.lock();
+    try self.mutex.lock(io);
 
     while (true) {
         if (self.pending_command == null) {
-            self.mutex.unlock();
+            self.mutex.unlock(io);
             return;
         }
 
-        self.cond.wait(&self.mutex);
+        try self.cond.wait(io, &self.mutex);
     }
 }
 
-pub fn stop(self: *Self) void {
-    self.mutex.lock();
+pub fn stop(self: *Self, io: Io) !void {
+    try self.mutex.lock(io);
     self.must_exit = true;
-    self.cond.signal();
-    self.mutex.unlock();
+    self.cond.signal(io);
+    self.mutex.unlock(io);
     self.thread.join();
 }
 
-fn thread_main(self: *Self) void {
+fn thread_main(self: *Self, io: Io, gpa: Allocator) !void {
     const am = AboveMask{
         .go_right = false,
         .go_up = false,
@@ -128,8 +130,8 @@ fn thread_main(self: *Self) void {
         .insert_after = false,
         .remove_cursor_node = false,
     };
-    self.mutex.lock();
-    const i = self.traverse_dynamically(self.root, am) catch std.process.exit(1);
+    try self.mutex.lock(io);
+    const i = self.traverse_dynamically(io, gpa, self.root, am) catch unreachable;
 
     // If our command masks are right, we received up_instruction.exit.
     std.debug.assert(i == .exit);
@@ -137,15 +139,17 @@ fn thread_main(self: *Self) void {
 
 fn traverse_dynamically(
     self: *Self,
+    io: Io,
+    gpa: Allocator,
     node_on_entry: Tree,
     above_mask: AboveMask,
 ) !up_instruction {
-    self.report_completion(node_on_entry, above_mask);
+    self.report_completion(io, node_on_entry, above_mask);
 
     var node = node_on_entry;
 
     while (true) {
-        const instr = if (self.receive()) |x| x else return .exit;
+        const instr = if (try self.receive(io)) |x| x else return .exit;
         const n = node.childCount();
 
         switch (instr) {
@@ -168,7 +172,7 @@ fn traverse_dynamically(
                             .remove_cursor_node = m.remove_at,
                         };
 
-                        const up_instr = try self.traverse_dynamically(node.childAt(i), am);
+                        const up_instr = try self.traverse_dynamically(io, gpa, node.childAt(i), am);
 
                         switch (up_instr) {
                             .go_left => {
@@ -185,15 +189,15 @@ fn traverse_dynamically(
                                 break;
                             },
                             .insert_before => {
-                                _ = try node.insertAt(i);
+                                _ = try node.insertAt(gpa, i);
                             },
                             .insert_after => {
-                                if (try node.insertAt(i + 1)) {
+                                if (try node.insertAt(gpa, i + 1)) {
                                     i += 1;
                                 }
                             },
                             .remove_cursor_node => {
-                                switch (node.removeAt(i)) {
+                                switch (node.removeAt(gpa, i)) {
                                     .done => {
                                         if (i == n) {
                                             i = i - 1;
@@ -210,7 +214,7 @@ fn traverse_dynamically(
             },
             .insert_inside => {
                 if (n == 0) {
-                    _ = try node.insertAt(0);
+                    _ = try node.insertAt(gpa, 0);
                 }
             },
             .insert_before => return .insert_before,
@@ -219,7 +223,7 @@ fn traverse_dynamically(
             .replace => unreachable,
         }
 
-        self.report_completion(node, above_mask);
+        self.report_completion(io, node, above_mask);
     }
 }
 

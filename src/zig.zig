@@ -1,5 +1,5 @@
 const std = @import("std");
-const cator = std.heap.c_allocator;
+const Allocator = std.mem.Allocator;
 const Error = std.mem.Allocator.Error;
 
 const Tree = @import("Tree.zig");
@@ -19,8 +19,8 @@ const OpType = enum {
         return @intFromEnum(a) <= @intFromEnum(b);
     }
 
-    pub fn render(self: @This(), sink: *Sink) !void {
-        try sink.appendAscii(switch (self) {
+    pub fn render(self: @This(), gpa: Allocator, sink: *Sink) !void {
+        try sink.appendAscii(gpa, switch (self) {
             .dot => ".",
         });
     }
@@ -65,98 +65,98 @@ const Node = union(enum) {
     any_type,
     fn_decl: *FnDecl,
 
-    pub fn drop(self: *Self) void {
+    pub fn drop(self: *Self, gpa: Allocator) void {
         switch (self.*) {
             .hole => {},
-            .identifier => |s| cator.free(s),
+            .identifier => |s| gpa.free(s),
             .call => |c| {
-                c.function.drop();
-                c.args.drop();
-                cator.destroy(c);
+                c.function.drop(gpa);
+                c.args.drop(gpa);
+                gpa.destroy(c);
             },
-            .arg_list => |*x| x.drop(),
-            .op => |*x| x.drop(),
-            .str_lit => |s| cator.free(s),
+            .arg_list => |*x| x.drop(gpa),
+            .op => |*x| x.drop(gpa),
+            .str_lit => |s| gpa.free(s),
             .try_expr => |x| {
-                x.drop();
-                cator.destroy(x);
+                x.drop(gpa);
+                gpa.destroy(x);
             },
             .expr_stmt => |x| {
-                x.drop();
-                cator.destroy(x);
+                x.drop(gpa);
+                gpa.destroy(x);
             },
-            .block => |*x| x.drop(),
+            .block => |*x| x.drop(gpa),
             .fn_proto => |s| {
-                s.identifier.drop();
-                s.param_list.drop();
-                s.return_type.drop();
-                cator.destroy(s);
+                s.identifier.drop(gpa);
+                s.param_list.drop(gpa);
+                s.return_type.drop(gpa);
+                gpa.destroy(s);
             },
             .param_list => |*x| {
-                x.drop();
+                x.drop(gpa);
             },
             .param_decl => |s| {
-                s.identifier.drop();
-                s.param_type.drop();
-                cator.destroy(s);
+                s.identifier.drop(gpa);
+                s.param_type.drop(gpa);
+                gpa.destroy(s);
             },
             .any_type => {},
             .fn_decl => |d| {
-                d.proto.drop();
-                d.body.drop();
-                cator.destroy(d);
+                d.proto.drop(gpa);
+                d.body.drop(gpa);
+                gpa.destroy(d);
             },
         }
     }
 
-    pub fn render(self: *Self, sink: *Sink, op: ?OpType) !void {
+    pub fn render(self: *Self, gpa: Allocator, sink: *Sink, op: ?OpType) !void {
         sink.startNode(self);
 
         _ = op;
 
         switch (self.*) {
-            .hole => try sink.appendHole(),
-            .identifier => |s| try sink.appendAscii(s),
+            .hole => try sink.appendHole(gpa),
+            .identifier => |s| try sink.appendAscii(gpa, s),
             .call => |c| {
-                try c.function.render(sink, null);
-                try c.args.render(sink, null);
+                try c.function.render(gpa, sink, null);
+                try c.args.render(gpa, sink, null);
             },
-            .arg_list => |*x| try x.render(sink),
-            .op => |*x| try x.render(sink, null),
+            .arg_list => |*x| try x.render(gpa, sink),
+            .op => |*x| try x.render(gpa, sink, null),
             .str_lit => |s| {
-                try sink.appendAscii("\"");
-                try sink.appendAscii(s);
-                try sink.appendAscii("\"");
+                try sink.appendAscii(gpa, "\"");
+                try sink.appendAscii(gpa, s);
+                try sink.appendAscii(gpa, "\"");
             },
             .try_expr => |x| {
-                try sink.appendAscii("try ");
-                try x.render(sink, null);
+                try sink.appendAscii(gpa, "try ");
+                try x.render(gpa, sink, null);
             },
             .expr_stmt => |x| {
-                try x.render(sink, null);
-                try sink.appendAscii(";");
+                try x.render(gpa, sink, null);
+                try sink.appendAscii(gpa, ";");
             },
-            .block => |*x| try x.render(sink),
+            .block => |*x| try x.render(gpa, sink),
             .fn_proto => |x| {
-                try sink.appendAscii("fn ");
-                try x.identifier.render(sink, null);
-                try x.param_list.render(sink, null);
-                try sink.appendAscii(" ");
-                try x.return_type.render(sink, null);
+                try sink.appendAscii(gpa, "fn ");
+                try x.identifier.render(gpa, sink, null);
+                try x.param_list.render(gpa, sink, null);
+                try sink.appendAscii(gpa, " ");
+                try x.return_type.render(gpa, sink, null);
             },
             .param_list => |*x| {
-                try x.render(sink);
+                try x.render(gpa, sink);
             },
             .param_decl => |x| {
-                try x.identifier.render(sink, null);
-                try sink.appendAscii(": ");
-                try x.param_type.render(sink, null);
+                try x.identifier.render(gpa, sink, null);
+                try sink.appendAscii(gpa, ": ");
+                try x.param_type.render(gpa, sink, null);
             },
-            .any_type => try sink.appendAscii("anytype"),
+            .any_type => try sink.appendAscii(gpa, "anytype"),
             .fn_decl => |d| {
-                try d.proto.render(sink, null);
-                try sink.appendAscii(" ");
-                try d.body.render(sink, null);
+                try d.proto.render(gpa, sink, null);
+                try sink.appendAscii(gpa, " ");
+                try d.body.render(gpa, sink, null);
             },
         }
 
@@ -227,29 +227,29 @@ const Node = union(enum) {
         };
     }
 
-    pub fn insertAt(self: *Self, i: usize) Error!bool {
+    pub fn insertAt(self: *Self, gpa: Allocator, i: usize) Error!bool {
         return switch (self.*) {
             .hole => false,
             .identifier => false,
             .call => false,
             .arg_list => |*x| {
-                try x.elements.insert(cator, i, .hole);
+                try x.elements.insert(gpa, i, .hole);
                 return true;
             },
             .op => |*x| {
-                try x.operands.insert(cator, i, .hole);
+                try x.operands.insert(gpa, i, .hole);
                 return true;
             },
             .str_lit => unreachable,
             .try_expr => false,
             .expr_stmt => false,
             .block => |*x| {
-                try x.elements.insert(cator, i, .hole);
+                try x.elements.insert(gpa, i, .hole);
                 return true;
             },
             .fn_proto => false,
             .param_list => |*l| {
-                try l.elements.insert(cator, i, try atoms.mkParamDecl());
+                try l.elements.insert(gpa, i, try atoms.mkParamDecl(gpa));
                 return true;
             },
             .param_decl => false,
@@ -258,17 +258,17 @@ const Node = union(enum) {
         };
     }
 
-    pub fn removeAt(self: *Self, i: usize) Tree.RemovalOutcome {
+    pub fn removeAt(self: *Self, gpa: Allocator, i: usize) Tree.RemovalOutcome {
         return switch (self.*) {
             .hole => unreachable,
             .identifier => unreachable,
             .call => .not_possible,
             .arg_list => |*l| blk: {
                 var elem = l.elements.orderedRemove(i);
-                elem.drop();
+                elem.drop(gpa);
                 break :blk .done;
             },
-            .op => |*x| switch (x.removeAt(i)) {
+            .op => |*x| switch (x.removeAt(gpa, i)) {
                 .normal => .done,
                 .replaced => .replaced,
             },
@@ -277,13 +277,13 @@ const Node = union(enum) {
             .expr_stmt => .not_possible,
             .block => |*x| blk: {
                 var stmt = x.elements.orderedRemove(i);
-                stmt.drop();
+                stmt.drop(gpa);
                 break :blk .done;
             },
             .fn_proto => .not_possible,
             .param_list => |*l| blk: {
                 var elem = l.elements.orderedRemove(i);
-                elem.drop();
+                elem.drop(gpa);
                 break :blk .done;
             },
             .param_decl => .not_possible,
@@ -325,16 +325,16 @@ const Node = union(enum) {
         return self.childAt(i);
     }
 
-    fn opaqueInsertAt(ptr: *anyopaque, i: usize) Error!bool {
+    fn opaqueInsertAt(ptr: *anyopaque, gpa: Allocator, i: usize) Error!bool {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
-        return self.insertAt(i);
+        return self.insertAt(gpa, i);
     }
 
-    fn opaqueRemoveAt(ptr: *anyopaque, i: usize) Tree.RemovalOutcome {
+    fn opaqueRemoveAt(ptr: *anyopaque, gpa: Allocator, i: usize) Tree.RemovalOutcome {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
-        return self.removeAt(i);
+        return self.removeAt(gpa, i);
     }
 
     fn opaqueGetMask(ptr: *anyopaque) Tree.Mask {
@@ -343,17 +343,17 @@ const Node = union(enum) {
         return self.getMask();
     }
 
-    fn opaqueRender(ptr: *anyopaque, sink: *Sink) Error!void {
+    fn opaqueRender(ptr: *anyopaque, gpa: Allocator, sink: *Sink) Error!void {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
-        return self.render(sink, null);
+        return self.render(gpa, sink, null);
     }
 
-    fn opaqueDeinit(ptr: *anyopaque) void {
+    fn opaqueDeinit(ptr: *anyopaque, gpa: Allocator) void {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
-        self.drop();
-        cator.destroy(self);
+        self.drop(gpa);
+        gpa.destroy(self);
     }
 
     const vtable = VTable{
@@ -381,22 +381,22 @@ const ArgList = lists.List(Node, "(", ")", .{ .symbol = ", " });
 
 const ParamList = lists.List(Node, "(", ")", .{ .symbol = ", " });
 
-pub fn get_sample() Error!Tree {
+pub fn get_sample(gpa: Allocator) Error!Tree {
     const dot_chain0 = blk: {
-        var x = try std.ArrayList(Node).initCapacity(cator, 4);
+        var x = try std.ArrayList(Node).initCapacity(gpa, 4);
 
-        x.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "std") });
-        x.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "fs") });
-        x.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "File") });
-        x.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "stdout") });
+        x.appendAssumeCapacity(Node{ .identifier = try gpa.dupe(u8, "std") });
+        x.appendAssumeCapacity(Node{ .identifier = try gpa.dupe(u8, "fs") });
+        x.appendAssumeCapacity(Node{ .identifier = try gpa.dupe(u8, "File") });
+        x.appendAssumeCapacity(Node{ .identifier = try gpa.dupe(u8, "stdout") });
 
         break :blk Node{ .op = .{ .operator = .dot, .operands = x, .offers = subtypes.expr } };
     };
 
-    var dot_chain = try std.ArrayList(Node).initCapacity(cator, 2);
+    var dot_chain = try std.ArrayList(Node).initCapacity(gpa, 2);
 
     {
-        const p = try cator.create(Call);
+        const p = try gpa.create(Call);
         p.* = .{
             .function = dot_chain0,
             .args = Node{ .arg_list = ArgList.initialValue() },
@@ -405,38 +405,38 @@ pub fn get_sample() Error!Tree {
         dot_chain.appendAssumeCapacity(Node{ .call = p });
     }
 
-    dot_chain.appendAssumeCapacity(Node{ .identifier = try cator.dupe(u8, "writeAll") });
+    dot_chain.appendAssumeCapacity(Node{ .identifier = try gpa.dupe(u8, "writeAll") });
 
     const qual_id = Node{ .op = .{ .operator = .dot, .operands = dot_chain, .offers = subtypes.expr } };
 
-    var args = try std.ArrayList(Node).initCapacity(cator, 1);
-    args.appendAssumeCapacity(Node{ .str_lit = try cator.dupe(u8, "Hello, World!\\n") });
+    var args = try std.ArrayList(Node).initCapacity(gpa, 1);
+    args.appendAssumeCapacity(Node{ .str_lit = try gpa.dupe(u8, "Hello, World!\\n") });
 
-    const call = try cator.create(Call);
+    const call = try gpa.create(Call);
     call.* = .{
         .function = qual_id,
         .args = Node{ .arg_list = ArgList{ .elements = args } },
     };
 
-    const call_node = try cator.create(Node);
+    const call_node = try gpa.create(Node);
     call_node.* = Node{ .call = call };
 
-    const te = try cator.create(Node);
+    const te = try gpa.create(Node);
     te.* = Node{ .try_expr = call_node };
 
     const s = Node{ .expr_stmt = te };
 
     var b = Block.initialValue();
 
-    try b.elements.append(cator, s);
+    try b.elements.append(gpa, s);
 
-    const proto = try cator.create(FnProto);
+    const proto = try gpa.create(FnProto);
     proto.* = blk: {
-        const id = Node{ .identifier = try cator.dupe(u8, "main") };
+        const id = Node{ .identifier = try gpa.dupe(u8, "main") };
 
         const plist = Node{ .param_list = ParamList.initialValue() };
 
-        const ret_typ = Node{ .identifier = try cator.dupe(u8, "void") };
+        const ret_typ = Node{ .identifier = try gpa.dupe(u8, "void") };
 
         break :blk FnProto{
             .identifier = id,
@@ -445,36 +445,36 @@ pub fn get_sample() Error!Tree {
         };
     };
 
-    const fnd = try cator.create(FnDecl);
+    const fnd = try gpa.create(FnDecl);
     fnd.* = FnDecl{
         .proto = Node{ .fn_proto = proto },
         .body = Node{ .block = b },
     };
 
-    const ret = try cator.create(Node);
+    const ret = try gpa.create(Node);
     ret.* = Node{ .fn_decl = fnd };
 
     return ret.to_tree(subtypes.decl);
 }
 
 const atoms = struct {
-    fn rwv(comptime f: fn () Error!Node) Tree.Rewriter {
+    fn rwv(comptime f: fn (Allocator) Error!Node) Tree.Rewriter {
         const local_module = struct {
-            fn g(ptr: *anyopaque) Error!void {
+            fn g(ptr: *anyopaque, gpa: Allocator) Error!void {
                 const node: *Node = @ptrCast(@alignCast(ptr));
 
-                node.* = try f();
+                node.* = try f(gpa);
             }
         };
 
         return .{ .from_void = local_module.g };
     }
-    fn rws(comptime f: fn ([]const u8) Error!Node) Tree.Rewriter {
+    fn rws(comptime f: fn (Allocator, []const u8) Error!Node) Tree.Rewriter {
         const local_module = struct {
-            fn g(ptr: *anyopaque, s: []const u8) Error!void {
+            fn g(ptr: *anyopaque, gpa: Allocator, s: []const u8) Error!void {
                 const node: *Node = @ptrCast(@alignCast(ptr));
 
-                node.* = try f(s);
+                node.* = try f(gpa, s);
             }
         };
 
@@ -492,8 +492,8 @@ const atoms = struct {
         return .{ .from_int = local_module.g };
     }
 
-    fn mkIdentifier(s: []const u8) Error!Node {
-        return Node{ .identifier = try cator.dupe(u8, s) };
+    fn mkIdentifier(gpa: Allocator, s: []const u8) Error!Node {
+        return Node{ .identifier = try gpa.dupe(u8, s) };
     }
 
     const identifier = Offer{
@@ -501,10 +501,10 @@ const atoms = struct {
         .rewriter = rws(mkIdentifier),
     };
 
-    fn mkCall() Error!Node {
+    fn mkCall(gpa: Allocator) Error!Node {
         const alist = ArgList.initialValue();
 
-        const p = try cator.create(Call);
+        const p = try gpa.create(Call);
         p.* = Call{ .function = .hole, .args = Node{ .arg_list = alist } };
         return .{ .call = p };
     }
@@ -524,10 +524,10 @@ const atoms = struct {
         return Offer{ .name = name, .rewriter = rwv(local_module.mkOp) };
     }
 
-    fn rwDot(ptr: *anyopaque) Error!void {
+    fn rwDot(ptr: *anyopaque, gpa: Allocator) Error!void {
         const self: *Node = @ptrCast(@alignCast(ptr));
 
-        self.* = Node{ .op = try Operation(Node, OpType).make_initial_value(.dot, .hole, subtypes.expr) };
+        self.* = Node{ .op = try Operation(Node, OpType).make_initial_value(gpa, .dot, .hole, subtypes.expr) };
     }
 
     const dot = Offer{
@@ -535,8 +535,8 @@ const atoms = struct {
         .rewriter = .{ .from_void = rwDot },
     };
 
-    fn mkStrLit(s: []const u8) Error!Node {
-        return Node{ .str_lit = try cator.dupe(u8, s) };
+    fn mkStrLit(gpa: Allocator, s: []const u8) Error!Node {
+        return Node{ .str_lit = try gpa.dupe(u8, s) };
     }
 
     const str_lit = Offer{
@@ -544,8 +544,8 @@ const atoms = struct {
         .rewriter = rws(mkStrLit),
     };
 
-    fn mkTryExpr() Error!Node {
-        const p = try cator.create(Node);
+    fn mkTryExpr(gpa: Allocator) Error!Node {
+        const p = try gpa.create(Node);
         p.* = .hole;
 
         return Node{ .try_expr = p };
@@ -556,8 +556,8 @@ const atoms = struct {
         .rewriter = rwv(mkTryExpr),
     };
 
-    fn mkExprStmt() Error!Node {
-        const p = try cator.create(Node);
+    fn mkExprStmt(gpa: Allocator) Error!Node {
+        const p = try gpa.create(Node);
         p.* = .hole;
 
         return Node{ .expr_stmt = p };
@@ -568,7 +568,7 @@ const atoms = struct {
         .rewriter = rwv(mkExprStmt),
     };
 
-    fn mkBlock() Error!Node {
+    fn mkBlock(_: Allocator) Error!Node {
         return Node{ .block = Block.initialValue() };
     }
 
@@ -577,8 +577,8 @@ const atoms = struct {
         .rewriter = rwv(mkBlock),
     };
 
-    fn mkFnProto() Error!Node {
-        const p = try cator.create(FnProto);
+    fn mkFnProto(gpa: Allocator) Error!Node {
+        const p = try gpa.create(FnProto);
         p.identifier = .hole;
         p.param_list = Node{ .param_list = ParamList.initialValue() };
     }
@@ -588,8 +588,8 @@ const atoms = struct {
         .rewriter = rwv(mkFnProto),
     };
 
-    fn mkParamDecl() Error!Node {
-        const p = try cator.create(ParamDecl);
+    fn mkParamDecl(gpa: Allocator) Error!Node {
+        const p = try gpa.create(ParamDecl);
         p.* = .{ .identifier = .hole, .param_type = .hole };
 
         return Node{ .param_decl = p };
@@ -600,7 +600,7 @@ const atoms = struct {
         .rewriter = rwv(mkParamDecl),
     };
 
-    fn mkAnyType() Error!Node {
+    fn mkAnyType(_: Allocator) Error!Node {
         return Node.any_type;
     }
 
@@ -609,15 +609,15 @@ const atoms = struct {
         .rewriter = rwv(mkAnyType),
     };
 
-    fn mkFnDecl() Error!Node {
-        const p = try cator.create(FnProto);
+    fn mkFnDecl(gpa: Allocator) Error!Node {
+        const p = try gpa.create(FnProto);
         p.* = FnProto{
             .identifier = .hole,
             .param_list = Node{ .param_list = ParamList.initialValue() },
             .return_type = .hole,
         };
 
-        const p0 = try cator.create(FnDecl);
+        const p0 = try gpa.create(FnDecl);
         p0.* = FnDecl{ .proto = Node{ .fn_proto = p }, .body = Node{ .block = Block.initialValue() } };
 
         return Node{ .fn_decl = p0 };

@@ -1,3 +1,6 @@
+const std = @import("std");
+const Init = std.process.Init;
+
 const adw = @import("adw");
 const gio = @import("gio");
 const gobject = @import("gobject");
@@ -7,6 +10,7 @@ const StedWindow = @import("stedwindow.zig").StedWindow;
 
 pub const StedApp = extern struct {
     parent_instance: Parent,
+    init: *const Init,
 
     pub const Parent = adw.Application;
 
@@ -14,11 +18,13 @@ pub const StedApp = extern struct {
         .classInit = &Class.init,
     });
 
-    pub fn new() *StedApp {
-        return gobject.ext.newInstance(StedApp, .{
+    pub fn new(init: *const Init) *StedApp {
+        const app = gobject.ext.newInstance(StedApp, .{
             .application_id = "org.ronan-d.sted",
             .flags = gio.ApplicationFlags{ .non_unique = true },
         });
+        app.init = init;
+        return app;
     }
 
     pub fn as(app: *StedApp, comptime T: type) *T {
@@ -31,7 +37,7 @@ pub const StedApp = extern struct {
         pub const Instance = StedApp;
 
         fn activateImpl(app: *StedApp) callconv(.c) void {
-            const win = StedWindow.new(app);
+            const win = StedWindow.new(app) catch unreachable;
 
             win.as(gtk.Window).present();
         }

@@ -1,5 +1,5 @@
 const std = @import("std");
-const cator = std.heap.c_allocator;
+const Init = std.process.Init;
 const Allocator = std.mem.Allocator;
 
 const adw = @import("adw");
@@ -48,6 +48,7 @@ pub const StedWindow = extern struct {
     srcprg: *Srcprg,
     controller: *gtk.ShortcutController,
     shortcut_pane: ShortcutPane,
+    pinit: *const Init,
 
     pub const Parent = adw.ApplicationWindow;
 
@@ -143,11 +144,6 @@ pub const StedWindow = extern struct {
                 last_arg,
             ),
         };
-
-        self.srcprg = cator.create(Srcprg) catch unreachable;
-        self.srcprg.* = Srcprg.new() catch unreachable;
-
-        self.refresh() catch unreachable;
     }
 
     fn bind_cb_to_key(_: *StedWindow, cb: fn (*StedWindow) void, keycode: c_uint) *gtk.Shortcut {
@@ -182,19 +178,13 @@ pub const StedWindow = extern struct {
     fn bind_command_to_key(win: *StedWindow, comptime command: commands.Command, keycode: c_uint) *gtk.Shortcut {
         const local_module = struct {
             fn cb(self: *StedWindow) void {
-                self.srcprg.cursor.perform(command);
+                self.srcprg.cursor.perform(self.pinit.io, command) catch unreachable;
 
                 self.refresh() catch unreachable;
             }
         };
 
         return win.bind_cb_to_key(local_module.cb, keycode);
-    }
-
-    fn dispose(self: *StedWindow) callconv(.c) void {
-        cator.destroy(self.srcprg);
-
-        gobject.Object.virtual_methods.dispose.call(Class.parent, self.as(Parent));
     }
 
     pub fn as(app: *StedWindow, comptime T: type) *T {
@@ -210,8 +200,8 @@ pub const StedWindow = extern struct {
     fn finalizeImpl(win: *StedWindow) callconv(.c) void {
         win.renderer.deinit();
 
-        win.srcprg.deinit();
-        cator.destroy(win.srcprg);
+        win.srcprg.deinit(win.pinit.io, win.pinit.gpa) catch unreachable;
+        win.pinit.gpa.destroy(win.srcprg);
 
         win.deinit();
 
@@ -230,10 +220,19 @@ pub const StedWindow = extern struct {
         }
     };
 
-    pub fn new(app: *StedApp) *StedWindow {
-        return gobject.ext.newInstance(StedWindow, .{
+    pub fn new(app: *StedApp) !*StedWindow {
+        const win = gobject.ext.newInstance(StedWindow, .{
             .application = app,
         });
+
+        win.pinit = app.init;
+
+        win.srcprg = try win.pinit.gpa.create(Srcprg);
+        win.srcprg.* = try Srcprg.new(win.pinit.io, win.pinit.gpa);
+
+        try win.refresh();
+
+        return win;
     }
 
     const Self = @This();
@@ -356,7 +355,7 @@ pub const StedWindow = extern struct {
             }
         }
 
-        self.renderer.render_frame(try self.srcprg.render());
+        self.renderer.render_frame(try self.srcprg.render(self.pinit.gpa));
     }
 
     pub fn deinit(self: *Self) void {
@@ -402,7 +401,7 @@ fn entry_cb_generic(
 ) fn (entry: *gtk.Entry, user_data: *anyopaque) callconv(.c) void {
     const local_module = struct {
         fn entry_cb(entry: *gtk.Entry, user_data: *anyopaque) callconv(.c) void {
-            const f: *const fn (*anyopaque, param_type) Allocator.Error!void = @ptrCast(user_data);
+            const f: *const fn (*anyopaque, Allocator, param_type) Allocator.Error!void = @ptrCast(user_data);
             const text = entry.getBuffer().getText();
 
             const text_slice = std.mem.sliceTo(text, 0);
@@ -416,7 +415,7 @@ fn entry_cb_generic(
             const win = gobject.ext.cast(StedWindow, win_widget).?;
 
             const ptr = win.srcprg.cursor.cursor_pos.ptr;
-            f(ptr, arg) catch unreachable;
+            f(ptr, win.pinit.gpa, arg) catch unreachable;
 
             win.refresh() catch unreachable;
 
@@ -440,7 +439,7 @@ fn string_from_string(text: [*:0]const u8) []const u8 {
 }
 
 fn button_cb_void(button: *gtk.Button, user_data: *anyopaque) callconv(.c) void {
-    const f: *const fn (*anyopaque) Allocator.Error!void = @ptrCast(user_data);
+    const f: *const fn (*anyopaque, Allocator) Allocator.Error!void = @ptrCast(user_data);
 
     const dialog_widget = button.as(gtk.Widget).getAncestor(adw.Dialog.getGObjectType()).?;
     const dialog = gobject.ext.cast(adw.Dialog, dialog_widget).?;
@@ -449,7 +448,7 @@ fn button_cb_void(button: *gtk.Button, user_data: *anyopaque) callconv(.c) void 
     const win = gobject.ext.cast(StedWindow, win_widget).?;
 
     const ptr = win.srcprg.cursor.cursor_pos.ptr;
-    f(ptr) catch unreachable;
+    f(ptr, win.pinit.gpa) catch unreachable;
 
     win.refresh() catch unreachable;
 

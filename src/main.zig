@@ -6,13 +6,13 @@ const gtk = @import("gtk");
 
 const StedApp = @import("stedapp.zig").StedApp;
 
-pub fn main() void {
-    var app = StedApp.new();
+pub fn main(init: std.process.Init) void {
+    var app = StedApp.new(&init);
     defer app.unref();
     const status = gio.Application.run(
         app.as(gio.Application),
-        @intCast(std.os.argv.len),
-        std.os.argv.ptr,
+        @intCast(init.minimal.args.vector.len),
+        @ptrCast(@constCast(init.minimal.args.vector.ptr)),
     );
     std.process.exit(@intCast(status));
 }

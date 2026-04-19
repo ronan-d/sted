@@ -1,5 +1,5 @@
 const std = @import("std");
-const cator = std.heap.c_allocator;
+const Allocator = std.mem.Allocator;
 const Error = std.mem.Allocator.Error;
 
 const Sink = @import("render.zig").Sink;
@@ -19,15 +19,15 @@ pub fn Operation(
 
         const drop_operand = @field(OperandType, "drop");
 
-        pub fn drop(self: *Self) void {
+        pub fn drop(self: *Self, gpa: Allocator) void {
             for (self.operands.items) |*operand| {
-                drop_operand(operand);
+                drop_operand(operand, gpa);
             }
 
-            self.operands.deinit(cator);
+            self.operands.deinit(gpa);
         }
 
-        pub fn render(self: Self, sink: *Sink, parent_operator: ?OperatorType) Error!void {
+        pub fn render(self: Self, gpa: Allocator, sink: *Sink, parent_operator: ?OperatorType) Error!void {
             // The absence of {start,end}_node calls is deliberate.
 
             const is_not_greater_than = @field(OperatorType, "isNotGreaterThan");
@@ -35,29 +35,34 @@ pub fn Operation(
             const need_parentheses = if (parent_operator) |po| is_not_greater_than(self.operator, po) else false;
 
             if (need_parentheses) {
-                try sink.appendAscii("(");
+                try sink.appendAscii(gpa, "(");
             }
 
             const render_operand = @field(OperandType, "render");
             const render_operator = @field(OperatorType, "render");
 
             if (0 < self.operands.items.len) {
-                try render_operand(&self.operands.items[0], sink, self.operator);
+                try render_operand(&self.operands.items[0], gpa, sink, self.operator);
 
                 for (self.operands.items[1..]) |*operand| {
-                    try render_operator(self.operator, sink);
+                    try render_operator(self.operator, gpa, sink);
 
-                    try render_operand(operand, sink, self.operator);
+                    try render_operand(operand, gpa, sink, self.operator);
                 }
             }
 
             if (need_parentheses) {
-                try sink.appendAscii(")");
+                try sink.appendAscii(gpa, ")");
             }
         }
 
-        pub fn make_initial_value(operator: OperatorType, hole: OperandType, offers: []const Offer) !Self {
-            var operands = try std.ArrayList(OperandType).initCapacity(cator, 2);
+        pub fn make_initial_value(
+            gpa: Allocator,
+            operator: OperatorType,
+            hole: OperandType,
+            offers: []const Offer,
+        ) !Self {
+            var operands = try std.ArrayList(OperandType).initCapacity(gpa, 2);
             operands.appendAssumeCapacity(hole);
             operands.appendAssumeCapacity(hole);
 
@@ -68,9 +73,9 @@ pub fn Operation(
             return &self.operands.items[i];
         }
 
-        pub fn insertAt(self: *Self, i: usize, hole: OperandType) Error!bool {
+        pub fn insertAt(self: *Self, gpa: Allocator, i: usize, hole: OperandType) Error!bool {
             if (i <= self.operands.items.len) {
-                try self.operands.insert(cator, i, hole);
+                try self.operands.insert(gpa, i, hole);
                 return true;
             }
 
@@ -82,12 +87,12 @@ pub fn Operation(
             replaced: OperandType,
         };
 
-        pub fn removeAt(self: *Self, i: usize) RemovalOutcome {
+        pub fn removeAt(self: *Self, gpa: Allocator, i: usize) RemovalOutcome {
             // orderedRemove makes the same assertion, but we keep this one for now.
             std.debug.assert(i < self.operands.items.len);
 
             var x = self.operands.orderedRemove(i);
-            drop_operand(&x);
+            drop_operand(&x, gpa);
 
             // It's an invariant that we should never have fewer than 2 operands.
             // We don't check it everywhere, but we do here.
@@ -95,7 +100,7 @@ pub fn Operation(
 
             if (self.operands.items.len == 1) {
                 const last_operand = self.operands.items[0];
-                self.operands.deinit(cator);
+                self.operands.deinit(gpa);
 
                 return RemovalOutcome{ .replaced = last_operand };
             }

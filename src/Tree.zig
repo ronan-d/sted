@@ -13,15 +13,15 @@ pub const VTable = struct {
 
     childAt: *const fn (*anyopaque, i: usize) Self,
 
-    insertAt: *const fn (*anyopaque, i: usize) Error!bool,
+    insertAt: *const fn (*anyopaque, Allocator, i: usize) Error!bool,
 
-    removeAt: *const fn (*anyopaque, i: usize) RemovalOutcome,
+    removeAt: *const fn (*anyopaque, Allocator, i: usize) RemovalOutcome,
 
     getMask: *const fn (*anyopaque) Mask,
 
-    render: *const fn (*anyopaque, sink: *Sink) Allocator.Error!void,
+    render: *const fn (*anyopaque, gpa: Allocator, sink: *Sink) Allocator.Error!void,
 
-    deinit: *const fn (*anyopaque) void,
+    deinit: *const fn (*anyopaque, Allocator) void,
 };
 
 const Self = @This();
@@ -34,8 +34,8 @@ pub fn childAt(self: *Self, n: usize) Self {
     return self.vtable.childAt(self.ptr, n);
 }
 
-pub fn insertAt(self: *Self, i: usize) Error!bool {
-    return self.vtable.insertAt(self.ptr, i);
+pub fn insertAt(self: *Self, gpa: Allocator, i: usize) Error!bool {
+    return self.vtable.insertAt(self.ptr, gpa, i);
 }
 
 pub const RemovalOutcome = union(enum) {
@@ -46,25 +46,25 @@ pub const RemovalOutcome = union(enum) {
     replaced,
 };
 
-pub fn removeAt(self: *Self, i: usize) RemovalOutcome {
-    return self.vtable.removeAt(self.ptr, i);
+pub fn removeAt(self: *Self, gpa: Allocator, i: usize) RemovalOutcome {
+    return self.vtable.removeAt(self.ptr, gpa, i);
 }
 
 pub fn getMask(self: Self) Mask {
     return self.vtable.getMask(self.ptr);
 }
 
-pub fn render(self: *Self, sink: *Sink) Allocator.Error!void {
-    return self.vtable.render(self.ptr, sink);
+pub fn render(self: *Self, gpa: Allocator, sink: *Sink) Allocator.Error!void {
+    return self.vtable.render(self.ptr, gpa, sink);
 }
 
-pub fn deinit(self: *Self) void {
-    self.vtable.deinit(self.ptr);
+pub fn deinit(self: *Self, gpa: Allocator) void {
+    self.vtable.deinit(self.ptr, gpa);
 }
 
 pub const Rewriter = union(enum) {
-    from_void: *const fn (*anyopaque) Allocator.Error!void,
-    from_string: *const fn (*anyopaque, []const u8) Allocator.Error!void,
+    from_void: *const fn (*anyopaque, Allocator) Allocator.Error!void,
+    from_string: *const fn (*anyopaque, Allocator, []const u8) Allocator.Error!void,
     from_int: *const fn (*anyopaque, u64) Allocator.Error!void,
 };
 

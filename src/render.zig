@@ -1,8 +1,8 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const Buffer = std.ArrayList(u8);
 
-const cator = std.heap.c_allocator;
 const Error = std.mem.Allocator.Error;
 
 pub const Sink = struct {
@@ -29,13 +29,13 @@ pub const Sink = struct {
         }
     }
 
-    fn append(self: *Self, s: []const u8, n_code_points: usize) Error!void {
-        try self.buf.appendSlice(cator, s);
+    fn append(self: *Self, gpa: Allocator, s: []const u8, n_code_points: usize) Error!void {
+        try self.buf.appendSlice(gpa, s);
         self.code_point_counter += n_code_points;
     }
 
-    pub fn appendAscii(self: *Self, s: []const u8) Error!void {
-        try self.append(s, s.len);
+    pub fn appendAscii(self: *Self, gpa: Allocator, s: []const u8) Error!void {
+        try self.append(gpa, s, s.len);
     }
 
     pub fn clear(self: *Self) void {
@@ -51,10 +51,10 @@ pub const Sink = struct {
         self.indentation_level -= 1;
     }
 
-    pub fn breakLine(self: *Self) !void {
+    pub fn breakLine(self: *Self, gpa: Allocator) !void {
         const n = self.indentation_level * indentation_unit;
 
-        try self.buf.ensureUnusedCapacity(cator, n + 1);
+        try self.buf.ensureUnusedCapacity(gpa, n + 1);
         self.buf.appendAssumeCapacity('\n');
         for (0..n) |_| {
             self.buf.appendAssumeCapacity(' ');
@@ -62,11 +62,11 @@ pub const Sink = struct {
         self.code_point_counter += n + 1;
     }
 
-    pub fn appendHole(self: *Self) !void {
-        try self.append("◆", 1);
+    pub fn appendHole(self: *Self, gpa: Allocator) !void {
+        try self.append(gpa, "◆", 1);
     }
 
-    pub fn deinit(self: *Self) void {
-        self.buf.deinit(cator);
+    pub fn deinit(self: *Self, gpa: Allocator) void {
+        self.buf.deinit(gpa);
     }
 };

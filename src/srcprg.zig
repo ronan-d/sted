@@ -1,6 +1,6 @@
 const std = @import("std");
-
-const cator = std.heap.c_allocator;
+const Io = std.Io;
+const Allocator = std.mem.Allocator;
 
 const Tree = @import("Tree.zig");
 
@@ -15,13 +15,13 @@ pub const Srcprg = struct {
 
     const Self = @This();
 
-    pub fn render(self: *Self) !Frame {
+    pub fn render(self: *Self, gpa: Allocator) !Frame {
         self.sink.clear();
 
         self.sink.cursor = self.cursor.cursor_pos.ptr;
-        try self.tree.render(&self.sink);
+        try self.tree.render(gpa, &self.sink);
 
-        try self.sink.buf.append(cator, 0);
+        try self.sink.buf.append(gpa, 0);
 
         return Frame{
             .text = self.sink.buf.items,
@@ -30,21 +30,21 @@ pub const Srcprg = struct {
         };
     }
 
-    pub fn new() !Self {
-        const x = try @import("zig.zig").get_sample();
+    pub fn new(io: Io, gpa: Allocator) !Self {
+        const x = try @import("zig.zig").get_sample(gpa);
 
         return Self{
             .tree = x,
             .cursor = blk: {
-                const p = cator.create(ThreadCursor) catch std.process.exit(1);
+                const p = try gpa.create(ThreadCursor);
                 p.* = ThreadCursor.init(x);
 
-                p.start();
+                try p.start(io, gpa);
 
                 break :blk p;
             },
             .sink = Sink{
-                .buf = .{},
+                .buf = .empty,
                 .cursor_start = undefined,
                 .cursor_end = undefined,
                 .cursor = x.ptr,
@@ -54,11 +54,11 @@ pub const Srcprg = struct {
         };
     }
 
-    pub fn deinit(self: *Self) void {
-        self.tree.deinit();
-        self.sink.deinit();
-        self.cursor.stop();
-        cator.destroy(self.cursor);
+    pub fn deinit(self: *Self, io: Io, gpa: Allocator) !void {
+        self.tree.deinit(gpa);
+        self.sink.deinit(gpa);
+        try self.cursor.stop(io);
+        gpa.destroy(self.cursor);
     }
 };
 

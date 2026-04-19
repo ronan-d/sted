@@ -1,5 +1,5 @@
 const std = @import("std");
-const cator = std.heap.c_allocator;
+const Allocator = std.mem.Allocator;
 const Error = std.mem.Allocator.Error;
 
 const Tree = @import("Tree.zig");
@@ -20,16 +20,16 @@ pub fn List(
 
         const Self = @This();
 
-        pub fn drop(self: *Self) void {
+        pub fn drop(self: *Self, gpa: Allocator) void {
             for (self.elements.items) |*x| {
-                x.drop();
+                x.drop(gpa);
             }
 
-            self.elements.deinit(cator);
+            self.elements.deinit(gpa);
         }
 
-        pub fn render(self: *Self, sink: *Sink) Error!void {
-            try sink.appendAscii(open);
+        pub fn render(self: *Self, gpa: Allocator, sink: *Sink) Error!void {
+            try sink.appendAscii(gpa, open);
 
             switch (sep) {
                 .break_lines => {
@@ -37,26 +37,26 @@ pub fn List(
                         sink.increaseIndentation();
 
                         for (self.elements.items) |*x| {
-                            try sink.breakLine();
-                            try x.render(sink, null);
+                            try sink.breakLine(gpa);
+                            try x.render(gpa, sink, null);
                         }
 
                         sink.decreaseIndentation();
-                        try sink.breakLine();
+                        try sink.breakLine(gpa);
                     }
                 },
                 .symbol => |s| {
                     for (self.elements.items, 0..) |*x, i| {
-                        try x.render(sink, null);
+                        try x.render(gpa, sink, null);
 
                         if (i + 1 < self.elements.items.len) {
-                            try sink.appendAscii(s);
+                            try sink.appendAscii(gpa, s);
                         }
                     }
                 },
             }
 
-            try sink.appendAscii(close);
+            try sink.appendAscii(gpa, close);
         }
 
         pub fn initialValue() Self {
@@ -69,10 +69,10 @@ pub fn List(
             return self.elements.items.len;
         }
 
-        fn insertAt(ptr: *anyopaque, i: usize) Error!bool {
+        fn insertAt(ptr: *anyopaque, gpa: Allocator, i: usize) Error!bool {
             const self: *Self = @ptrCast(@alignCast(ptr));
 
-            try self.elements.insert(cator, i, try ElementType.initialValue());
+            try self.elements.insert(gpa, i, try ElementType.initialValue());
 
             return true;
         }
