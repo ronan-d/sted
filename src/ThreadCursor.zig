@@ -150,21 +150,20 @@ fn traverse_dynamically(
 
     while (true) {
         const instr = if (try self.receive(io)) |x| x else return .exit;
-        const n = node.childCount();
 
         switch (instr) {
             .go_right => return .go_right,
             .go_up => return .do_nothing,
             .go_left => return .go_left,
             .go_down => {
-                if (0 < n) {
+                if (0 < node.childCount()) {
                     var i: usize = 0;
 
                     while (true) {
                         const m = node.getMask();
 
                         const am = AboveMask{
-                            .go_right = i + 1 < n,
+                            .go_right = i + 1 < node.childCount(),
                             .go_up = true,
                             .go_left = 0 < i,
                             .insert_before = m.insert_at,
@@ -181,7 +180,7 @@ fn traverse_dynamically(
                                 }
                             },
                             .go_right => {
-                                if (i + 1 < n) {
+                                if (i + 1 < node.childCount()) {
                                     i += 1;
                                 }
                             },
@@ -199,7 +198,11 @@ fn traverse_dynamically(
                             .remove_cursor_node => {
                                 switch (node.removeAt(gpa, i)) {
                                     .done => {
-                                        if (i == n) {
+                                        if (node.childCount() == 0) {
+                                            break;
+                                        }
+
+                                        if (i == node.childCount()) {
                                             i = i - 1;
                                         }
                                     },
@@ -213,7 +216,7 @@ fn traverse_dynamically(
                 }
             },
             .insert_inside => {
-                if (n == 0) {
+                if (node.childCount() == 0) {
                     _ = try node.insertAt(gpa, 0);
                 }
             },
