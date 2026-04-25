@@ -9,6 +9,8 @@ modules:
     build-commands:
       - cd zig-gobject && ../zig-compiler/zig build --fork=../zig-xml codegen -Dmodules=Gtk-4.0 -Dmodules=Adw-1 -Dgir-files-path=/usr/share/gir-1.0
       - cd sted && ../zig-compiler/zig build --prefix $FLATPAK_DEST
+      - install -Dm644 sted/sted.desktop ${FLATPAK_DEST}/share/applications/${FLATPAK_ID}.desktop
+      - install -Dm644 sted/icon.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/${FLATPAK_ID}.svg
     sources:
       - type: archive
         url: https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz

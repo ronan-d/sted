@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Sted
+Exec=sted
+Type=Application
+Icon=io.github.ronan_d.sted
+Categories=Development;
