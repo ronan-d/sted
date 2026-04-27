@@ -1,4 +1,0 @@
-- Add "insert inside" command.
-- Source view theme.
-- Check for memory leaks.
-- Improve cursor display for single-statement list.
