@@ -24,8 +24,9 @@ modules:
         url: https://github.com/ianprime0509/zig-gobject.git
         branch: main
         dest: zig-gobject
-      - type: dir
+      - type: git
         path: .
+        branch: main
         dest: sted
 finish-args:
   - --socket=fallback-x11
