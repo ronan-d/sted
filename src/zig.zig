@@ -49,6 +49,12 @@ const FnDecl = struct {
     body: Node,
 };
 
+const ConstDecl = struct {
+    identifier: Node,
+    type_mark: ?Node,
+    expression: Node,
+};
+
 const Node = union(enum) {
     hole,
     identifier: []u8,
@@ -64,6 +70,7 @@ const Node = union(enum) {
     param_decl: *ParamDecl,
     any_type,
     fn_decl: *FnDecl,
+    const_decl: *ConstDecl,
 
     pub fn drop(self: *Self, gpa: Allocator) void {
         switch (self.*) {
@@ -104,6 +111,14 @@ const Node = union(enum) {
             .fn_decl => |d| {
                 d.proto.drop(gpa);
                 d.body.drop(gpa);
+                gpa.destroy(d);
+            },
+            .const_decl => |d| {
+                d.identifier.drop(gpa);
+                if (d.type_mark) |*t| {
+                    t.drop(gpa);
+                }
+                d.expression.drop(gpa);
                 gpa.destroy(d);
             },
         }
@@ -158,6 +173,17 @@ const Node = union(enum) {
                 try sink.appendAscii(gpa, " ");
                 try d.body.render(gpa, sink, null);
             },
+            .const_decl => |d| {
+                try sink.appendAscii(gpa, "const ");
+                try d.identifier.render(gpa, sink, null);
+                if (d.type_mark) |*t| {
+                    try sink.appendAscii(gpa, " : ");
+                    try t.render(gpa, sink, null);
+                }
+                try sink.appendAscii(gpa, " = ");
+                try d.expression.render(gpa, sink, null);
+                try sink.appendAscii(gpa, ";");
+            },
         }
 
         sink.endNode(self);
@@ -179,6 +205,7 @@ const Node = union(enum) {
             .param_decl => 2,
             .any_type => 0,
             .fn_decl => 2,
+            .const_decl => |d| if (d.type_mark) |_| 3 else 2,
         };
     }
 
@@ -224,6 +251,12 @@ const Node = union(enum) {
                 1 => d.body.to_tree(subtypes.block),
                 else => unreachable,
             },
+            .const_decl => |d| switch (i) {
+                0 => d.identifier.to_tree(subtypes.defining_identifier),
+                1 => if (d.type_mark) |*t| t.to_tree(subtypes.param_type) else d.expression.to_tree(subtypes.expr),
+                2 => if (d.type_mark) |_| d.expression.to_tree(subtypes.expr) else unreachable,
+                else => unreachable,
+            },
         };
     }
 
@@ -255,6 +288,7 @@ const Node = union(enum) {
             .param_decl => false,
             .any_type => unreachable,
             .fn_decl => false,
+            .const_decl => false,
         };
     }
 
@@ -289,6 +323,7 @@ const Node = union(enum) {
             .param_decl => .not_possible,
             .any_type => unreachable,
             .fn_decl => .not_possible,
+            .const_decl => .not_possible,
         };
     }
 
@@ -304,6 +339,7 @@ const Node = union(enum) {
             .param_decl,
             .any_type,
             .fn_decl,
+            .const_decl,
             => Tree.Mask{ .insert_at = false, .remove_at = false },
             .arg_list,
             .op,
@@ -627,6 +663,23 @@ const atoms = struct {
         .name = "fn",
         .rewriter = rwv(mkFnDecl),
     };
+
+    fn mkConstDecl(gpa: Allocator) Error!Node {
+        const p = try gpa.create(ConstDecl);
+
+        p.* = ConstDecl{
+            .identifier = .hole,
+            .type_mark = .hole,
+            .expression = .hole,
+        };
+
+        return Node{ .const_decl = p };
+    }
+
+    const const_decl = Offer{
+        .name = "const",
+        .rewriter = rwv(mkConstDecl),
+    };
 };
 
 const subtypes = struct {
@@ -643,6 +696,7 @@ const subtypes = struct {
     const stmt: Subtype = &[_]Offer{
         atoms.expr_stmt,
         atoms.block,
+        atoms.const_decl,
     };
 
     const defining_identifier: Subtype = &[_]Offer{
