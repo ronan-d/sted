@@ -29,7 +29,7 @@ pub fn List(
         }
 
         pub fn render(self: *Self, gpa: Allocator, sink: *Sink) Error!void {
-            try sink.appendAscii(gpa, open);
+            try sink.append(open);
 
             switch (sep) {
                 .break_lines => {
@@ -37,12 +37,12 @@ pub fn List(
                         sink.increaseIndentation();
 
                         for (self.elements.items) |*x| {
-                            try sink.breakLine(gpa);
+                            try sink.breakLine();
                             try x.render(gpa, sink, null);
                         }
 
                         sink.decreaseIndentation();
-                        try sink.breakLine(gpa);
+                        try sink.breakLine();
                     }
                 },
                 .symbol => |s| {
@@ -50,13 +50,13 @@ pub fn List(
                         try x.render(gpa, sink, null);
 
                         if (i + 1 < self.elements.items.len) {
-                            try sink.appendAscii(gpa, s);
+                            try sink.append(s);
                         }
                     }
                 },
             }
 
-            try sink.appendAscii(gpa, close);
+            try sink.append(close);
         }
 
         pub fn initialValue() Self {

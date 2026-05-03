@@ -35,7 +35,7 @@ pub fn Operation(
             const need_parentheses = if (parent_operator) |po| is_not_greater_than(self.operator, po) else false;
 
             if (need_parentheses) {
-                try sink.appendAscii(gpa, "(");
+                try sink.append("(");
             }
 
             const render_operand = @field(OperandType, "render");
@@ -45,14 +45,14 @@ pub fn Operation(
                 try render_operand(&self.operands.items[0], gpa, sink, self.operator);
 
                 for (self.operands.items[1..]) |*operand| {
-                    try render_operator(self.operator, gpa, sink);
+                    try render_operator(self.operator, sink);
 
                     try render_operand(operand, gpa, sink, self.operator);
                 }
             }
 
             if (need_parentheses) {
-                try sink.appendAscii(gpa, ")");
+                try sink.append(")");
             }
         }
 

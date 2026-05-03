@@ -19,36 +19,13 @@ const StedApp = @import("stedapp.zig").StedApp;
 const Tree = @import("Tree.zig");
 const commands = @import("commands.zig");
 
-const Renderer = extern struct {
-    buffer: *gtk.TextBuffer,
-    tag: *gtk.TextTag,
-
-    const Self = @This();
-
-    pub fn render_frame(self: Self, frame: Frame) void {
-        const with_sentinel: [:0]const u8 = frame.text[0 .. frame.text.len - 1 :0];
-
-        self.buffer.setText(with_sentinel, @intCast(with_sentinel.len));
-
-        var start: gtk.TextIter = undefined;
-        self.buffer.getIterAtOffset(&start, @intCast(frame.start_offset));
-
-        var end: gtk.TextIter = undefined;
-        self.buffer.getIterAtOffset(&end, @intCast(frame.end_offset));
-
-        self.buffer.applyTag(self.tag, &start, &end);
-    }
-
-    fn deinit(_: *Self) void {}
-};
-
 pub const StedWindow = extern struct {
     parent_instance: Parent,
-    renderer: Renderer,
     srcprg: *Srcprg,
     controller: *gtk.ShortcutController,
     shortcut_pane: ShortcutPane,
     pinit: *const Init,
+    text_buffer: *gtk.TextBuffer,
 
     pub const Parent = adw.ApplicationWindow;
 
@@ -130,20 +107,7 @@ pub const StedWindow = extern struct {
 
         self.as(adw.ApplicationWindow).setContent(toolbar_view.as(gtk.Widget));
 
-        const last_arg: ?*anyopaque = null;
-
-        const buffer = text_view.getBuffer();
-
-        self.renderer = Renderer{
-            .buffer = buffer,
-            .tag = buffer.createTag(
-                "cursor-tag",
-                "background",
-                // This is from Helix's "dark_plus" theme, which probably comes from VS Code.
-                "#3a3d41",
-                last_arg,
-            ),
-        };
+        self.text_buffer = text_view.getBuffer();
     }
 
     fn bind_cb_to_key(_: *StedWindow, cb: fn (*StedWindow) void, keycode: c_uint) *gtk.Shortcut {
@@ -198,8 +162,6 @@ pub const StedWindow = extern struct {
     });
 
     fn finalizeImpl(win: *StedWindow) callconv(.c) void {
-        win.renderer.deinit();
-
         win.srcprg.deinit(win.pinit.io, win.pinit.gpa) catch unreachable;
         win.pinit.gpa.destroy(win.srcprg);
 
@@ -228,7 +190,7 @@ pub const StedWindow = extern struct {
         win.pinit = app.init;
 
         win.srcprg = try win.pinit.gpa.create(Srcprg);
-        win.srcprg.* = try Srcprg.new(win.pinit.io, win.pinit.gpa);
+        win.srcprg.* = try Srcprg.new(win.pinit.io, win.pinit.gpa, win.text_buffer);
 
         try win.refresh();
 
@@ -355,7 +317,7 @@ pub const StedWindow = extern struct {
             }
         }
 
-        self.renderer.render_frame(try self.srcprg.render(self.pinit.gpa));
+        try self.srcprg.render(self.pinit.gpa);
     }
 
     pub fn deinit(self: *Self) void {

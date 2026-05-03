@@ -19,8 +19,8 @@ const OpType = enum {
         return @intFromEnum(a) <= @intFromEnum(b);
     }
 
-    pub fn render(self: @This(), gpa: Allocator, sink: *Sink) !void {
-        try sink.appendAscii(gpa, switch (self) {
+    pub fn render(self: @This(), sink: *Sink) !void {
+        try sink.append(switch (self) {
             .dot => ".",
         });
     }
@@ -130,8 +130,8 @@ const Node = union(enum) {
         _ = op;
 
         switch (self.*) {
-            .hole => try sink.appendHole(gpa),
-            .identifier => |s| try sink.appendAscii(gpa, s),
+            .hole => try sink.appendHole(),
+            .identifier => |s| try sink.append(s),
             .call => |c| {
                 try c.function.render(gpa, sink, null);
                 try c.args.render(gpa, sink, null);
@@ -139,24 +139,24 @@ const Node = union(enum) {
             .arg_list => |*x| try x.render(gpa, sink),
             .op => |*x| try x.render(gpa, sink, null),
             .str_lit => |s| {
-                try sink.appendAscii(gpa, "\"");
-                try sink.appendAscii(gpa, s);
-                try sink.appendAscii(gpa, "\"");
+                try sink.append("\"");
+                try sink.append(s);
+                try sink.append("\"");
             },
             .try_expr => |x| {
-                try sink.appendAscii(gpa, "try ");
+                try sink.append("try ");
                 try x.render(gpa, sink, null);
             },
             .expr_stmt => |x| {
                 try x.render(gpa, sink, null);
-                try sink.appendAscii(gpa, ";");
+                try sink.append(";");
             },
             .block => |*x| try x.render(gpa, sink),
             .fn_proto => |x| {
-                try sink.appendAscii(gpa, "fn ");
+                try sink.append("fn ");
                 try x.identifier.render(gpa, sink, null);
                 try x.param_list.render(gpa, sink, null);
-                try sink.appendAscii(gpa, " ");
+                try sink.append(" ");
                 try x.return_type.render(gpa, sink, null);
             },
             .param_list => |*x| {
@@ -164,25 +164,25 @@ const Node = union(enum) {
             },
             .param_decl => |x| {
                 try x.identifier.render(gpa, sink, null);
-                try sink.appendAscii(gpa, ": ");
+                try sink.append(": ");
                 try x.param_type.render(gpa, sink, null);
             },
-            .any_type => try sink.appendAscii(gpa, "anytype"),
+            .any_type => try sink.append("anytype"),
             .fn_decl => |d| {
                 try d.proto.render(gpa, sink, null);
-                try sink.appendAscii(gpa, " ");
+                try sink.append(" ");
                 try d.body.render(gpa, sink, null);
             },
             .const_decl => |d| {
-                try sink.appendAscii(gpa, "const ");
+                try sink.append("const ");
                 try d.identifier.render(gpa, sink, null);
                 if (d.type_mark) |*t| {
-                    try sink.appendAscii(gpa, " : ");
+                    try sink.append(" : ");
                     try t.render(gpa, sink, null);
                 }
-                try sink.appendAscii(gpa, " = ");
+                try sink.append(" = ");
                 try d.expression.render(gpa, sink, null);
-                try sink.appendAscii(gpa, ";");
+                try sink.append(";");
             },
         }
 
