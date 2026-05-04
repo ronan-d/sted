@@ -139,12 +139,15 @@ const Node = union(enum) {
             .arg_list => |*x| try x.render(gpa, sink),
             .op => |*x| try x.render(gpa, sink, null),
             .str_lit => |s| {
+                sink.active_tag = .str_lit;
                 try sink.append("\"");
                 try sink.append(s);
                 try sink.append("\"");
+                sink.active_tag = null;
             },
             .try_expr => |x| {
-                try sink.append("try ");
+                sink.tagged("try", .keyword);
+                try sink.append(" ");
                 try x.render(gpa, sink, null);
             },
             .expr_stmt => |x| {
@@ -153,11 +156,17 @@ const Node = union(enum) {
             },
             .block => |*x| try x.render(gpa, sink),
             .fn_proto => |x| {
-                try sink.append("fn ");
+                sink.tagged("fn", .keyword);
+                try sink.append(" ");
+                sink.active_tag = .function;
                 try x.identifier.render(gpa, sink, null);
+                sink.active_tag = null;
                 try x.param_list.render(gpa, sink, null);
                 try sink.append(" ");
+
+                sink.active_tag = .type;
                 try x.return_type.render(gpa, sink, null);
+                sink.active_tag = null;
             },
             .param_list => |*x| {
                 try x.render(gpa, sink);
@@ -165,7 +174,10 @@ const Node = union(enum) {
             .param_decl => |x| {
                 try x.identifier.render(gpa, sink, null);
                 try sink.append(": ");
+
+                sink.active_tag = .type;
                 try x.param_type.render(gpa, sink, null);
+                sink.active_tag = null;
             },
             .any_type => try sink.append("anytype"),
             .fn_decl => |d| {
@@ -174,11 +186,14 @@ const Node = union(enum) {
                 try d.body.render(gpa, sink, null);
             },
             .const_decl => |d| {
-                try sink.append("const ");
+                sink.tagged("const", .keyword);
+                try sink.append(" ");
                 try d.identifier.render(gpa, sink, null);
                 if (d.type_mark) |*t| {
                     try sink.append(" : ");
+                    sink.active_tag = .type;
                     try t.render(gpa, sink, null);
+                    sink.active_tag = null;
                 }
                 try sink.append(" = ");
                 try d.expression.render(gpa, sink, null);

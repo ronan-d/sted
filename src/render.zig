@@ -4,34 +4,30 @@ const Error = std.mem.Allocator.Error;
 
 const gtk = @import("gtk");
 
+const highlight = @import("highlight.zig");
+const Highlighter = highlight.Highlighter;
+const Tag = highlight.Tag;
+
 pub const Sink = struct {
     buf: *gtk.TextBuffer,
     cursor: *anyopaque,
     cursor_start: *gtk.TextMark,
     indentation_level: usize,
-    cursor_tag: *gtk.TextTag,
+    highlighter: Highlighter,
+    active_tag: ?Tag,
 
     const indentation_unit = 2;
 
     const Self = @This();
 
     pub fn init(buf: *gtk.TextBuffer) Self {
-        const last_arg: ?*anyopaque = null;
-
-        const cursor_tag = buf.createTag(
-            "cursor-tag",
-            "background",
-            // This is from Helix's "dark_plus" theme, which probably comes from VS Code.
-            "#3a3d41",
-            last_arg,
-        );
-
         return Self{
             .buf = buf,
             .cursor = undefined,
             .cursor_start = gtk.TextMark.new("cursor-start", 1),
             .indentation_level = 0,
-            .cursor_tag = cursor_tag,
+            .highlighter = highlight.init(buf),
+            .active_tag = null,
         };
     }
 
@@ -55,14 +51,12 @@ pub const Sink = struct {
             var end: gtk.TextIter = undefined;
             self.buf.getEndIter(&end);
 
-            self.buf.applyTag(self.cursor_tag, &start, &end);
+            self.buf.applyTag(self.highlighter.get(.cursor), &start, &end);
         }
     }
 
     pub fn append(self: *Self, s: []const u8) Error!void {
-        var end: gtk.TextIter = undefined;
-        self.buf.getEndIter(&end);
-        self.buf.insert(&end, @ptrCast(s.ptr), @intCast(s.len));
+        self.innerAppend(s, null);
     }
 
     pub fn clear(self: *Self) void {
@@ -89,6 +83,31 @@ pub const Sink = struct {
 
     pub fn appendHole(self: *Self) !void {
         try self.append("◆");
+    }
+
+    pub fn tagged(self: *Self, s: []const u8, tag: Tag) void {
+        self.innerAppend(s, tag);
+    }
+
+    fn innerAppend(self: *Self, s: []const u8, tag: ?Tag) void {
+        const last_arg: ?*anyopaque = null;
+
+        var end: gtk.TextIter = undefined;
+        self.buf.getEndIter(&end);
+
+        const merged_tag = tag orelse self.active_tag;
+
+        if (merged_tag) |t| {
+            self.buf.insertWithTags(
+                &end,
+                @ptrCast(s.ptr),
+                @intCast(s.len),
+                self.highlighter.get(t),
+                last_arg,
+            );
+        } else {
+            self.buf.insert(&end, @ptrCast(s.ptr), @intCast(s.len));
+        }
     }
 
     pub fn deinit(_: *Self) void {}
