@@ -83,6 +83,10 @@ pub const StedWindow = extern struct {
                 pane.append(p.at(c).box.as(gtk.Widget));
             }
 
+            // This checks that my interpretation of Widget.get_last_child is correct.
+            std.debug.assert(pane.as(gtk.Widget).getLastChild() ==
+                p.at(commands.all_commands[commands.all_commands.len - 1]).box.as(gtk.Widget));
+
             break :blk pane;
         };
 
