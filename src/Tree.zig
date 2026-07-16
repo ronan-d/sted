@@ -30,11 +30,11 @@ pub fn childCount(self: Self) usize {
     return self.vtable.childCount(self.ptr);
 }
 
-pub fn childAt(self: *Self, n: usize) Self {
+pub fn childAt(self: Self, n: usize) Self {
     return self.vtable.childAt(self.ptr, n);
 }
 
-pub fn insertAt(self: *Self, gpa: Allocator, i: usize) Error!bool {
+pub fn insertAt(self: Self, gpa: Allocator, i: usize) Error!bool {
     return self.vtable.insertAt(self.ptr, gpa, i);
 }
 
@@ -46,7 +46,7 @@ pub const RemovalOutcome = union(enum) {
     replaced,
 };
 
-pub fn removeAt(self: *Self, gpa: Allocator, i: usize) RemovalOutcome {
+pub fn removeAt(self: Self, gpa: Allocator, i: usize) RemovalOutcome {
     return self.vtable.removeAt(self.ptr, gpa, i);
 }
 
@@ -54,11 +54,11 @@ pub fn getMask(self: Self) Mask {
     return self.vtable.getMask(self.ptr);
 }
 
-pub fn render(self: *Self, gpa: Allocator, sink: *Sink) Allocator.Error!void {
+pub fn render(self: Self, gpa: Allocator, sink: *Sink) Allocator.Error!void {
     return self.vtable.render(self.ptr, gpa, sink);
 }
 
-pub fn deinit(self: *Self, gpa: Allocator) void {
+pub fn deinit(self: Self, gpa: Allocator) void {
     self.vtable.deinit(self.ptr, gpa);
 }
 
@@ -73,7 +73,7 @@ pub const Offer = struct {
     rewriter: Rewriter,
 };
 
-pub fn getOffers(self: *const Self) []const Offer {
+pub fn getOffers(self: Self) []const Offer {
     return self.replacement_offers;
 }
 
