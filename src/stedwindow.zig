@@ -29,91 +29,6 @@ pub const StedWindow = extern struct {
 
     pub const Parent = adw.ApplicationWindow;
 
-    fn init(self: *StedWindow, _: *Class) callconv(.c) void {
-        self.as(gtk.Window).setTitle("Sted");
-
-        const text_view = gtk.TextView.new();
-        text_view.setEditable(0);
-        text_view.setCursorVisible(0);
-        text_view.setMonospace(1);
-
-        {
-            const provider = gtk.CssProvider.new();
-            defer provider.unref();
-
-            const style_string = @embedFile("style.css");
-
-            provider.loadFromString(style_string);
-            text_view.as(gtk.Widget).getStyleContext().addProvider(
-                provider.as(gtk.StyleProvider),
-                gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            );
-        }
-
-        {
-            const controller = gtk.ShortcutController.new();
-            controller.as(gtk.EventController).setPropagationPhase(gtk.PropagationPhase.bubble);
-
-            self.as(gtk.Widget).addController(controller.as(gtk.EventController));
-
-            self.controller = controller;
-        }
-
-        const p: ShortcutPane = blk: {
-            var x: ShortcutPane = undefined;
-
-            inline for (commands.all_commands) |c| {
-                const k = c.keycode();
-                const s = if (local_method(c)) |m| self.bind_cb_to_key(m, k) else self.bind_command_to_key(c, k);
-                x.at_mut(c).* = Shortcut.fromGtkShortcut(s, c.displayText(), k);
-            }
-
-            break :blk x;
-        };
-
-        self.shortcut_pane = p;
-
-        const side_pane = blk: {
-            const pane = gtk.Box.new(gtk.Orientation.vertical, ui_layout.sep_size);
-            pane.as(gtk.Widget).setSizeRequest(ui_layout.unit_in_pixels, -1);
-
-            pane.as(gtk.Widget).setMarginTop(ui_layout.sep_size);
-
-            for (commands.all_commands) |c| {
-                pane.append(p.at(c).box.as(gtk.Widget));
-            }
-
-            // This checks that my interpretation of Widget.get_last_child is correct.
-            std.debug.assert(pane.as(gtk.Widget).getLastChild() ==
-                p.at(commands.all_commands[commands.all_commands.len - 1]).box.as(gtk.Widget));
-
-            break :blk pane;
-        };
-
-        text_view.as(gtk.Widget).setSizeRequest(
-            4 * ui_layout.unit_in_pixels,
-            4 * ui_layout.unit_in_pixels,
-        );
-
-        const paned = gtk.Paned.new(gtk.Orientation.horizontal);
-        paned.setStartChild(text_view.as(gtk.Widget));
-        paned.setEndChild(side_pane.as(gtk.Widget));
-        paned.setResizeStartChild(1);
-        paned.setResizeEndChild(0);
-        paned.setShrinkStartChild(0);
-        paned.setShrinkEndChild(0);
-
-        const toolbar_view = adw.ToolbarView.new();
-
-        toolbar_view.addTopBar(adw.HeaderBar.new().as(gtk.Widget));
-
-        toolbar_view.setContent(paned.as(gtk.Widget));
-
-        self.as(adw.ApplicationWindow).setContent(toolbar_view.as(gtk.Widget));
-
-        self.text_buffer = text_view.getBuffer();
-    }
-
     fn bind_cb_to_key(_: *StedWindow, cb: fn (*StedWindow) void, keycode: c_uint) *gtk.Shortcut {
         // TODO perhaps adding some sort of name to the action will be needed for
         // display later.
@@ -160,7 +75,6 @@ pub const StedWindow = extern struct {
     }
 
     pub const getGObjectType = gobject.ext.defineClass(StedWindow, .{
-        .instanceInit = &init,
         .classInit = Class.init,
         .parent_class = &Class.parent,
     });
@@ -192,6 +106,88 @@ pub const StedWindow = extern struct {
         });
 
         win.pinit = app.init;
+        win.as(gtk.Window).setTitle("Sted");
+
+        const text_view = gtk.TextView.new();
+        text_view.setEditable(0);
+        text_view.setCursorVisible(0);
+        text_view.setMonospace(1);
+
+        {
+            const provider = gtk.CssProvider.new();
+            defer provider.unref();
+
+            const style_string = @embedFile("style.css");
+
+            provider.loadFromString(style_string);
+            text_view.as(gtk.Widget).getStyleContext().addProvider(
+                provider.as(gtk.StyleProvider),
+                gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            );
+        }
+
+        {
+            const controller = gtk.ShortcutController.new();
+            controller.as(gtk.EventController).setPropagationPhase(gtk.PropagationPhase.bubble);
+
+            win.as(gtk.Widget).addController(controller.as(gtk.EventController));
+
+            win.controller = controller;
+        }
+
+        const p: ShortcutPane = blk: {
+            var x: ShortcutPane = undefined;
+
+            inline for (commands.all_commands) |c| {
+                const k = c.keycode();
+                const s = if (local_method(c)) |m| win.bind_cb_to_key(m, k) else win.bind_command_to_key(c, k);
+                x.at_mut(c).* = Shortcut.fromGtkShortcut(s, c.displayText(), k);
+            }
+
+            break :blk x;
+        };
+
+        win.shortcut_pane = p;
+
+        const side_pane = blk: {
+            const pane = gtk.Box.new(gtk.Orientation.vertical, ui_layout.sep_size);
+            pane.as(gtk.Widget).setSizeRequest(ui_layout.unit_in_pixels, -1);
+
+            pane.as(gtk.Widget).setMarginTop(ui_layout.sep_size);
+
+            for (commands.all_commands) |c| {
+                pane.append(p.at(c).box.as(gtk.Widget));
+            }
+
+            // This checks that my interpretation of Widget.get_last_child is correct.
+            std.debug.assert(pane.as(gtk.Widget).getLastChild() ==
+                p.at(commands.all_commands[commands.all_commands.len - 1]).box.as(gtk.Widget));
+
+            break :blk pane;
+        };
+
+        text_view.as(gtk.Widget).setSizeRequest(
+            4 * ui_layout.unit_in_pixels,
+            4 * ui_layout.unit_in_pixels,
+        );
+
+        const paned = gtk.Paned.new(gtk.Orientation.horizontal);
+        paned.setStartChild(text_view.as(gtk.Widget));
+        paned.setEndChild(side_pane.as(gtk.Widget));
+        paned.setResizeStartChild(1);
+        paned.setResizeEndChild(0);
+        paned.setShrinkStartChild(0);
+        paned.setShrinkEndChild(0);
+
+        const toolbar_view = adw.ToolbarView.new();
+
+        toolbar_view.addTopBar(adw.HeaderBar.new().as(gtk.Widget));
+
+        toolbar_view.setContent(paned.as(gtk.Widget));
+
+        win.as(adw.ApplicationWindow).setContent(toolbar_view.as(gtk.Widget));
+
+        win.text_buffer = text_view.getBuffer();
 
         win.srcprg = try win.pinit.gpa.create(Srcprg);
         win.srcprg.* = try Srcprg.new(win.pinit.io, win.pinit.gpa, win.text_buffer);
