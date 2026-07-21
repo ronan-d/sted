@@ -29,18 +29,34 @@ pub const StedWindow = extern struct {
 
     pub const Parent = adw.ApplicationWindow;
 
-    fn bind_cb_to_key(_: *StedWindow, cb: fn (*StedWindow) void, keycode: c_uint) *gtk.Shortcut {
+    fn bind_cb_to_key(
+        T: type,
+        data: T,
+        cb: *const fn (*StedWindow, T) void,
+        keycode: c_uint,
+        gpa: Allocator,
+    ) Allocator.Error!*gtk.Shortcut {
         // TODO perhaps adding some sort of name to the action will be needed for
         // display later.
 
         const trigger = gtk.KeyvalTrigger.new(keycode, .{});
 
         const cb_action = blk: {
-            const local_module = struct {
-                fn gtk_cb(wid: *gtk.Widget, _: ?*glib.Variant, _: ?*anyopaque) callconv(.c) c_int {
-                    const self: *StedWindow = gobject.ext.cast(StedWindow, wid).?;
+            const Closure = struct {
+                cb: *const fn (*StedWindow, T) void,
+                data: T,
+            };
 
-                    cb(self);
+            const closure = try gpa.create(Closure);
+            closure.* = Closure{ .cb = cb, .data = data };
+
+            const local_module = struct {
+                fn gtk_cb(wid: *gtk.Widget, _: ?*glib.Variant, opaque_ptr: ?*anyopaque) callconv(.c) c_int {
+                    const window: *StedWindow = gobject.ext.cast(StedWindow, wid).?;
+
+                    const ptr: *Closure = @ptrCast(@alignCast(opaque_ptr));
+
+                    ptr.cb(window, ptr.data);
 
                     return 1;
                 }
@@ -48,7 +64,7 @@ pub const StedWindow = extern struct {
 
             const scf: gtk.ShortcutFunc = local_module.gtk_cb;
 
-            const cba = gtk.CallbackAction.new(scf, null, null);
+            const cba = gtk.CallbackAction.new(scf, closure, null);
 
             break :blk cba;
         };
@@ -58,16 +74,20 @@ pub const StedWindow = extern struct {
         return shortcut;
     }
 
-    fn bind_command_to_key(win: *StedWindow, comptime command: commands.Command, keycode: c_uint) *gtk.Shortcut {
+    fn bind_command_to_key(
+        comptime command: commands.Command,
+        keycode: c_uint,
+        gpa: Allocator,
+    ) Allocator.Error!*gtk.Shortcut {
         const local_module = struct {
-            fn cb(self: *StedWindow) void {
-                self.srcprg.cursor.perform(self.pinit.io, command) catch unreachable;
+            fn cb(self: *StedWindow, cmd: commands.Command) void {
+                self.srcprg.cursor.perform(self.pinit.io, cmd) catch unreachable;
 
                 self.refresh() catch unreachable;
             }
         };
 
-        return win.bind_cb_to_key(local_module.cb, keycode);
+        return try bind_cb_to_key(commands.Command, command, local_module.cb, keycode, gpa);
     }
 
     pub fn as(app: *StedWindow, comptime T: type) *T {
@@ -106,6 +126,7 @@ pub const StedWindow = extern struct {
         });
 
         win.pinit = app.init;
+
         win.as(gtk.Window).setTitle("Sted");
 
         const text_view = gtk.TextView.new();
@@ -140,7 +161,14 @@ pub const StedWindow = extern struct {
 
             inline for (commands.all_commands) |c| {
                 const k = c.keycode();
-                const s = if (local_method(c)) |m| win.bind_cb_to_key(m, k) else win.bind_command_to_key(c, k);
+                const s = try if (local_method(c)) |m| blk2: {
+                    const local_module = struct {
+                        fn cb(w: *StedWindow, _: void) void {
+                            m(w);
+                        }
+                    };
+                    break :blk2 bind_cb_to_key(void, {}, local_module.cb, k, win.pinit.gpa);
+                } else bind_command_to_key(c, k, win.pinit.gpa);
                 x.at_mut(c).* = Shortcut.fromGtkShortcut(s, c.displayText(), k);
             }
 
