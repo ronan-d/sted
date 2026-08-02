@@ -6,6 +6,8 @@ const Allocator = std.mem.Allocator;
 const Tree = @import("Tree.zig");
 const commands = @import("commands.zig");
 const Command = commands.Command;
+const Mask = commands.Mask;
+const DynamicCommand = commands.DynamicCommand;
 
 mutex: Io.Mutex,
 cond: Io.Condition,
@@ -14,6 +16,7 @@ must_exit: bool,
 root: Tree,
 cursor_pos: Tree,
 amask: AboveMask,
+cmds: []const DynamicCommand,
 thread: std.Thread,
 
 const Self = @This();
@@ -68,6 +71,7 @@ fn report_completion(self: *Self, io: Io, cursor_pos: Tree, am: AboveMask) void 
     self.pending_command = null;
     self.cursor_pos = cursor_pos;
     self.amask = am;
+    self.cmds = cursor_pos.commands();
     self.cond.signal(io);
     self.mutex.unlock(io);
 }
@@ -81,6 +85,7 @@ pub fn init(root: Tree) Self {
         .root = root,
         .cursor_pos = root,
         .amask = undefined,
+        .cmds = &[_]DynamicCommand{},
         .thread = undefined,
     };
 }
@@ -229,8 +234,6 @@ fn traverse_dynamically(
         self.report_completion(io, node, above_mask);
     }
 }
-
-pub const Mask = commands.Map(bool);
 
 // The part of the command mask for which we need to look at the parent of the
 // node that's under the cursor, and not the node itself. "Above" because the

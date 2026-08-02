@@ -54,7 +54,7 @@ pub const all_commands = std.enums.values(Command);
 
 pub fn Map(T: type) type {
     // Note: std.enums.EnumArray would be nice here, but we need the "extern".
-    return extern struct {
+    return struct {
         array: [all_commands.len]T,
 
         pub fn at(self: @This(), c: Command) T {
@@ -66,3 +66,11 @@ pub fn Map(T: type) type {
         }
     };
 }
+
+pub const DynamicCommand = struct {
+    display_text: [:0]const u8,
+    keycode: c_uint,
+    func: *const fn (*anyopaque) void,
+};
+
+pub const Mask = Map(bool);

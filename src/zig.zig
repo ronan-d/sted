@@ -2,6 +2,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Error = std.mem.Allocator.Error;
 
+const gdk = @import("gdk");
+
 const Tree = @import("Tree.zig");
 const VTable = Tree.VTable;
 const Offer = Tree.Offer;
@@ -11,6 +13,8 @@ const Sink = @import("render.zig").Sink;
 const Operation = @import("assoc.zig").Operation;
 
 const lists = @import("lists.zig");
+
+const DynamicCommand = @import("commands.zig").DynamicCommand;
 
 const OpType = enum {
     dot,
@@ -47,6 +51,20 @@ const Block = lists.List(Node, "{", "}", .break_lines);
 const FnDecl = struct {
     proto: Node,
     body: Node,
+    is_public: bool,
+
+    fn togglePub(self: *FnDecl) void {
+        self.is_public = !self.is_public;
+    }
+
+    fn opaqueTogglePub(ptr: *anyopaque) void {
+        const node: *Node = @ptrCast(@alignCast(ptr));
+
+        switch (node.*) {
+            .fn_decl => |d| d.togglePub(),
+            else => unreachable,
+        }
+    }
 };
 
 const ConstDecl = struct {
@@ -55,7 +73,7 @@ const ConstDecl = struct {
     expression: Node,
 };
 
-const Node = union(enum) {
+pub const Node = union(enum) {
     hole,
     identifier: []u8,
     call: *Call,
@@ -181,6 +199,10 @@ const Node = union(enum) {
             },
             .any_type => try sink.append("anytype"),
             .fn_decl => |d| {
+                if (d.is_public) {
+                    sink.tagged("pub", .keyword);
+                    try sink.append(" ");
+                }
                 try d.proto.render(gpa, sink, null);
                 try sink.append(" ");
                 try d.body.render(gpa, sink, null);
@@ -364,6 +386,19 @@ const Node = union(enum) {
         };
     }
 
+    pub fn commands(self: Self) []const DynamicCommand {
+        return switch (self) {
+            .fn_decl => &[_]DynamicCommand{
+                .{
+                    .display_text = "pub",
+                    .keycode = gdk.KEY_p,
+                    .func = FnDecl.opaqueTogglePub,
+                },
+            },
+            else => &[_]DynamicCommand{},
+        };
+    }
+
     fn opaqueChildCount(ptr: *anyopaque) usize {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
@@ -394,6 +429,12 @@ const Node = union(enum) {
         return self.getMask();
     }
 
+    fn opaqueCommands(ptr: *anyopaque) []const DynamicCommand {
+        const self: *Self = @ptrCast(@alignCast(ptr));
+
+        return self.commands();
+    }
+
     fn opaqueRender(ptr: *anyopaque, gpa: Allocator, sink: *Sink) Error!void {
         const self: *Self = @ptrCast(@alignCast(ptr));
 
@@ -414,6 +455,7 @@ const Node = union(enum) {
         .removeAt = opaqueRemoveAt,
         .getMask = opaqueGetMask,
         .deinit = opaqueDeinit,
+        .commands = opaqueCommands,
         .render = opaqueRender,
     };
 
@@ -500,6 +542,7 @@ pub fn get_sample(gpa: Allocator) Error!Tree {
     fnd.* = FnDecl{
         .proto = Node{ .fn_proto = proto },
         .body = Node{ .block = b },
+        .is_public = true,
     };
 
     const ret = try gpa.create(Node);
@@ -669,7 +712,11 @@ const atoms = struct {
         };
 
         const p0 = try gpa.create(FnDecl);
-        p0.* = FnDecl{ .proto = Node{ .fn_proto = p }, .body = Node{ .block = Block.initialValue() } };
+        p0.* = FnDecl{
+            .proto = Node{ .fn_proto = p },
+            .body = Node{ .block = Block.initialValue() },
+            .is_public = false,
+        };
 
         return Node{ .fn_decl = p0 };
     }

@@ -8,6 +8,8 @@ replacement_offers: []const Offer,
 
 const Sink = @import("render.zig").Sink;
 
+const DynamicCommand = @import("commands.zig").DynamicCommand;
+
 pub const VTable = struct {
     childCount: *const fn (*anyopaque) usize,
 
@@ -18,6 +20,8 @@ pub const VTable = struct {
     removeAt: *const fn (*anyopaque, Allocator, i: usize) RemovalOutcome,
 
     getMask: *const fn (*anyopaque) Mask,
+
+    commands: *const fn (*anyopaque) []const DynamicCommand,
 
     render: *const fn (*anyopaque, gpa: Allocator, sink: *Sink) Allocator.Error!void,
 
@@ -54,6 +58,10 @@ pub fn getMask(self: Self) Mask {
     return self.vtable.getMask(self.ptr);
 }
 
+pub fn commands(self: Self) []const DynamicCommand {
+    return self.vtable.commands(self.ptr);
+}
+
 pub fn render(self: Self, gpa: Allocator, sink: *Sink) Allocator.Error!void {
     return self.vtable.render(self.ptr, gpa, sink);
 }
@@ -85,3 +93,7 @@ pub const Mask = struct {
     insert_at: bool,
     remove_at: bool,
 };
+
+pub fn executeCommand(self: *Self, command: DynamicCommand) void {
+    command.func(self.ptr);
+}

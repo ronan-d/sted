@@ -18,12 +18,13 @@ const Srcprg = @import("srcprg.zig").Srcprg;
 const StedApp = @import("stedapp.zig").StedApp;
 const Tree = @import("Tree.zig");
 const commands = @import("commands.zig");
+const shortcuts = @import("shortcuts.zig");
+const ui_layout = @import("ui_layout.zig");
 
 pub const StedWindow = extern struct {
     parent_instance: Parent,
     srcprg: *Srcprg,
-    controller: *gtk.ShortcutController,
-    shortcut_pane: ShortcutPane,
+    shortcut_pane: *shortcuts.Pane,
     pinit: *const Init,
     text_buffer: *gtk.TextBuffer,
 
@@ -147,52 +148,10 @@ pub const StedWindow = extern struct {
             );
         }
 
-        {
-            const controller = gtk.ShortcutController.new();
-            controller.as(gtk.EventController).setPropagationPhase(gtk.PropagationPhase.bubble);
+        win.shortcut_pane = try win.pinit.gpa.create(shortcuts.Pane);
+        win.shortcut_pane.* = try shortcuts.Pane.init(win.pinit.gpa);
 
-            win.as(gtk.Widget).addController(controller.as(gtk.EventController));
-
-            win.controller = controller;
-        }
-
-        const p: ShortcutPane = blk: {
-            var x: ShortcutPane = undefined;
-
-            inline for (commands.all_commands) |c| {
-                const k = c.keycode();
-                const s = try if (local_method(c)) |m| blk2: {
-                    const local_module = struct {
-                        fn cb(w: *StedWindow, _: void) void {
-                            m(w);
-                        }
-                    };
-                    break :blk2 bind_cb_to_key(void, {}, local_module.cb, k, win.pinit.gpa);
-                } else bind_command_to_key(c, k, win.pinit.gpa);
-                x.at_mut(c).* = Shortcut.fromGtkShortcut(s, c.displayText(), k);
-            }
-
-            break :blk x;
-        };
-
-        win.shortcut_pane = p;
-
-        const side_pane = blk: {
-            const pane = gtk.Box.new(gtk.Orientation.vertical, ui_layout.sep_size);
-            pane.as(gtk.Widget).setSizeRequest(ui_layout.unit_in_pixels, -1);
-
-            pane.as(gtk.Widget).setMarginTop(ui_layout.sep_size);
-
-            for (commands.all_commands) |c| {
-                pane.append(p.at(c).box.as(gtk.Widget));
-            }
-
-            // This checks that my interpretation of Widget.get_last_child is correct.
-            std.debug.assert(pane.as(gtk.Widget).getLastChild() ==
-                p.at(commands.all_commands[commands.all_commands.len - 1]).box.as(gtk.Widget));
-
-            break :blk pane;
-        };
+        win.as(gtk.Widget).addController(win.shortcut_pane.controller.as(gtk.EventController));
 
         text_view.as(gtk.Widget).setSizeRequest(
             4 * ui_layout.unit_in_pixels,
@@ -201,7 +160,9 @@ pub const StedWindow = extern struct {
 
         const paned = gtk.Paned.new(gtk.Orientation.horizontal);
         paned.setStartChild(text_view.as(gtk.Widget));
-        paned.setEndChild(side_pane.as(gtk.Widget));
+
+        paned.setEndChild(win.shortcut_pane.vbox.as(gtk.Widget));
+
         paned.setResizeStartChild(1);
         paned.setResizeEndChild(0);
         paned.setShrinkStartChild(0);
@@ -322,38 +283,15 @@ pub const StedWindow = extern struct {
         dialog.present(self.as(gtk.Widget));
     }
 
-    pub fn refresh(self: *Self) !void {
-        const m = self.srcprg.cursor.getMask();
+    pub fn refresh(self: *Self) Allocator.Error!void {
+        const c = self.srcprg.cursor;
 
-        for (commands.all_commands) |c| {
-            const s = self.shortcut_pane.at_mut(c);
-            const on = m.at(c);
-
-            s.box.as(gtk.Widget).setSensitive(if (on) 1 else 0);
-
-            if (s.is_in_controller and !on) {
-                self.controller.removeShortcut(s.gtks);
-                s.is_in_controller = false;
-            }
-
-            if (!s.is_in_controller and on) {
-                // addShortcut takes ownership of its argument. We want to keep
-                // the shortcut alive so we increment the reference count.
-                s.gtks.ref();
-                self.controller.addShortcut(s.gtks);
-                s.is_in_controller = true;
-            }
-        }
+        try self.shortcut_pane.update(c.getMask(), c.cmds, self.pinit.gpa);
 
         try self.srcprg.render(self.pinit.gpa);
     }
 
-    pub fn deinit(self: *Self) void {
-        for (commands.all_commands) |c| {
-            const s = self.shortcut_pane.at_mut(c);
-            s.gtks.unref();
-        }
-    }
+    pub fn deinit(_: *Self) void {}
 };
 
 fn button_cb_generic(
@@ -451,46 +389,6 @@ fn close_dialog(d: *adw.Dialog) void {
         @panic("Failed to close dialog");
     }
 }
-
-const ui_layout = struct {
-    const unit_in_pixels = 200;
-
-    const sep_size = 12;
-};
-
-const Shortcut = extern struct {
-    box: *gtk.Box,
-    gtks: *gtk.Shortcut,
-    is_in_controller: bool,
-
-    fn fromGtkShortcut(gtks: *gtk.Shortcut, display_text: [:0]const u8, keycode: c_uint) Shortcut {
-        const row = gtk.Box.new(gtk.Orientation.horizontal, ui_layout.sep_size);
-
-        const key_string = gtk.acceleratorGetLabel(keycode, gdk.ModifierType.flags_no_modifier_mask);
-        defer std.c.free(key_string);
-
-        const sclabel = gtk.ShortcutLabel.new(key_string);
-        sclabel.as(gtk.Widget).setHalign(gtk.Align.center);
-        sclabel.as(gtk.Widget).setMarginStart(ui_layout.sep_size);
-
-        row.append(sclabel.as(gtk.Widget));
-
-        const label = gtk.Label.new(display_text);
-        label.as(gtk.Widget).setHalign(gtk.Align.end);
-        label.as(gtk.Widget).setHexpand(0);
-        label.as(gtk.Widget).setMarginEnd(0);
-
-        row.append(label.as(gtk.Widget));
-
-        return Shortcut{
-            .box = row,
-            .gtks = gtks,
-            .is_in_controller = false,
-        };
-    }
-};
-
-const ShortcutPane = commands.Map(Shortcut);
 
 fn local_method(c: commands.Command) ?fn (*StedWindow) void {
     return switch (c) {
