@@ -26,7 +26,6 @@ pub const StedWindow = extern struct {
     srcprg: *Srcprg,
     shortcut_pane: *shortcuts.Pane,
     pinit: *const Init,
-    text_buffer: *gtk.TextBuffer,
 
     pub const Parent = adw.ApplicationWindow;
 
@@ -176,10 +175,8 @@ pub const StedWindow = extern struct {
 
         win.as(adw.ApplicationWindow).setContent(toolbar_view.as(gtk.Widget));
 
-        win.text_buffer = text_view.getBuffer();
-
         win.srcprg = try win.pinit.gpa.create(Srcprg);
-        win.srcprg.* = try Srcprg.new(win.pinit.io, win.pinit.gpa, win.text_buffer);
+        win.srcprg.* = try Srcprg.new(win.pinit.io, win.pinit.gpa, text_view.getBuffer());
 
         try win.refresh();
 
