@@ -71,7 +71,7 @@ fn bind_command_to_key(
 ) Allocator.Error!*gtk.Shortcut {
     const local_module = struct {
         fn cb(self: *StedWindow, cmd: commands.Command) void {
-            self.srcprg.cursor.perform(self.pinit.io, cmd) catch unreachable;
+            self.core.srcprg.cursor.perform(self.core.init.io, cmd) catch unreachable;
 
             self.refresh() catch unreachable;
         }
@@ -209,7 +209,7 @@ pub const Pane = struct {
         for (cmds) |cmd| {
             const local_module = struct {
                 fn cb(w: *StedWindow, cmd0: DynamicCommand) void {
-                    w.srcprg.cursor.cursor_pos.executeCommand(cmd0);
+                    w.core.srcprg.cursor.cursor_pos.executeCommand(cmd0);
 
                     w.refresh() catch unreachable;
                 }

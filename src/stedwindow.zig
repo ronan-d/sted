@@ -12,6 +12,7 @@ const pango = @import("pango");
 
 const Frame = @import("Frame.zig");
 
+const Core = @import("Core.zig");
 const ThreadCursor = @import("ThreadCursor.zig");
 const instruction = ThreadCursor.instruction;
 const Srcprg = @import("srcprg.zig").Srcprg;
@@ -23,9 +24,7 @@ const ui_layout = @import("ui_layout.zig");
 
 pub const StedWindow = extern struct {
     parent_instance: Parent,
-    srcprg: *Srcprg,
-    shortcut_pane: *shortcuts.Pane,
-    pinit: *const Init,
+    core: *Core,
 
     pub const Parent = adw.ApplicationWindow;
 
@@ -100,9 +99,6 @@ pub const StedWindow = extern struct {
     });
 
     fn finalizeImpl(win: *StedWindow) callconv(.c) void {
-        win.srcprg.deinit(win.pinit.io, win.pinit.gpa) catch unreachable;
-        win.pinit.gpa.destroy(win.srcprg);
-
         win.deinit();
 
         gobject.Object.virtual_methods.finalize.call(Class.parent, win.as(Parent));
@@ -125,8 +121,6 @@ pub const StedWindow = extern struct {
             .application = app,
         });
 
-        win.pinit = app.init;
-
         win.as(gtk.Window).setTitle("Sted");
 
         const text_view = gtk.TextView.new();
@@ -147,10 +141,10 @@ pub const StedWindow = extern struct {
             );
         }
 
-        win.shortcut_pane = try win.pinit.gpa.create(shortcuts.Pane);
-        win.shortcut_pane.* = try shortcuts.Pane.init(win.pinit.gpa);
+        win.core = try app.init.gpa.create(Core);
+        win.core.* = try Core.new(app.init.*, text_view.getBuffer());
 
-        win.as(gtk.Widget).addController(win.shortcut_pane.controller.as(gtk.EventController));
+        win.as(gtk.Widget).addController(win.core.shortcut_pane.controller.as(gtk.EventController));
 
         text_view.as(gtk.Widget).setSizeRequest(
             4 * ui_layout.unit_in_pixels,
@@ -160,7 +154,7 @@ pub const StedWindow = extern struct {
         const paned = gtk.Paned.new(gtk.Orientation.horizontal);
         paned.setStartChild(text_view.as(gtk.Widget));
 
-        paned.setEndChild(win.shortcut_pane.vbox.as(gtk.Widget));
+        paned.setEndChild(win.core.shortcut_pane.vbox.as(gtk.Widget));
 
         paned.setResizeStartChild(1);
         paned.setResizeEndChild(0);
@@ -174,9 +168,6 @@ pub const StedWindow = extern struct {
         toolbar_view.setContent(paned.as(gtk.Widget));
 
         win.as(adw.ApplicationWindow).setContent(toolbar_view.as(gtk.Widget));
-
-        win.srcprg = try win.pinit.gpa.create(Srcprg);
-        win.srcprg.* = try Srcprg.new(win.pinit.io, win.pinit.gpa, text_view.getBuffer());
 
         try win.refresh();
 
@@ -193,7 +184,7 @@ pub const StedWindow = extern struct {
         dialog.setFollowsContentSize(1);
         dialog.setPresentationMode(adw.DialogPresentationMode.floating);
 
-        const offers = self.srcprg.cursor.cursor_pos.getOffers();
+        const offers = self.core.srcprg.cursor.cursor_pos.getOffers();
 
         for (offers) |offer| {
             const button = gtk.Button.newWithMnemonic(offer.name);
@@ -281,11 +272,11 @@ pub const StedWindow = extern struct {
     }
 
     pub fn refresh(self: *Self) Allocator.Error!void {
-        const c = self.srcprg.cursor;
+        const c = self.core.srcprg.cursor;
 
-        try self.shortcut_pane.update(c.getMask(), c.cmds, self.pinit.gpa);
+        try self.core.shortcut_pane.update(c.getMask(), c.cmds, self.core.init.gpa);
 
-        try self.srcprg.render(self.pinit.gpa);
+        try self.core.srcprg.render(self.core.init.gpa);
     }
 
     pub fn deinit(_: *Self) void {}
@@ -339,8 +330,8 @@ fn entry_cb_generic(
             const win_widget = dialog_widget.getAncestor(StedWindow.getGObjectType()).?;
             const win = gobject.ext.cast(StedWindow, win_widget).?;
 
-            const ptr = win.srcprg.cursor.cursor_pos.ptr;
-            f(ptr, win.pinit.gpa, arg) catch unreachable;
+            const ptr = win.core.srcprg.cursor.cursor_pos.ptr;
+            f(ptr, win.core.init.gpa, arg) catch unreachable;
 
             win.refresh() catch unreachable;
 
@@ -372,8 +363,8 @@ fn button_cb_void(button: *gtk.Button, user_data: *anyopaque) callconv(.c) void 
     const win_widget = dialog_widget.getAncestor(StedWindow.getGObjectType()).?;
     const win = gobject.ext.cast(StedWindow, win_widget).?;
 
-    const ptr = win.srcprg.cursor.cursor_pos.ptr;
-    f(ptr, win.pinit.gpa) catch unreachable;
+    const ptr = win.core.srcprg.cursor.cursor_pos.ptr;
+    f(ptr, win.core.init.gpa) catch unreachable;
 
     win.refresh() catch unreachable;
 
