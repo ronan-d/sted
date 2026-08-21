@@ -73,7 +73,7 @@ fn bind_command_to_key(
         fn cb(self: *StedWindow, cmd: commands.Command) void {
             self.core.srcprg.cursor.perform(self.core.init.io, cmd) catch unreachable;
 
-            self.refresh() catch unreachable;
+            self.core.refresh() catch unreachable;
         }
     };
 
@@ -211,7 +211,7 @@ pub const Pane = struct {
                 fn cb(w: *StedWindow, cmd0: DynamicCommand) void {
                     w.core.srcprg.cursor.cursor_pos.executeCommand(cmd0);
 
-                    w.refresh() catch unreachable;
+                    w.core.refresh() catch unreachable;
                 }
             };
 

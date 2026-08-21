@@ -169,7 +169,7 @@ pub const StedWindow = extern struct {
 
         win.as(adw.ApplicationWindow).setContent(toolbar_view.as(gtk.Widget));
 
-        try win.refresh();
+        try win.core.refresh();
 
         return win;
     }
@@ -271,14 +271,6 @@ pub const StedWindow = extern struct {
         dialog.present(self.as(gtk.Widget));
     }
 
-    pub fn refresh(self: *Self) Allocator.Error!void {
-        const c = self.core.srcprg.cursor;
-
-        try self.core.shortcut_pane.update(c.getMask(), c.cmds, self.core.init.gpa);
-
-        try self.core.srcprg.render(self.core.init.gpa);
-    }
-
     pub fn deinit(_: *Self) void {}
 };
 
@@ -333,7 +325,7 @@ fn entry_cb_generic(
             const ptr = win.core.srcprg.cursor.cursor_pos.ptr;
             f(ptr, win.core.init.gpa, arg) catch unreachable;
 
-            win.refresh() catch unreachable;
+            win.core.refresh() catch unreachable;
 
             close_dialog(dialog);
         }
@@ -366,7 +358,7 @@ fn button_cb_void(button: *gtk.Button, user_data: *anyopaque) callconv(.c) void 
     const ptr = win.core.srcprg.cursor.cursor_pos.ptr;
     f(ptr, win.core.init.gpa) catch unreachable;
 
-    win.refresh() catch unreachable;
+    win.core.refresh() catch unreachable;
 
     close_dialog(dialog);
 }

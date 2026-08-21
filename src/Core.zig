@@ -28,3 +28,11 @@ pub fn new(init: Init, text_buffer: *gtk.TextBuffer) !Self {
 pub fn deinit(self: *Self) void {
     self.srcprg.deinit(self.init.io, self.init.gpa);
 }
+
+pub fn refresh(self: *Self) Allocator.Error!void {
+    const c = self.srcprg.cursor;
+
+    try self.shortcut_pane.update(c.getMask(), c.cmds, self.init.gpa);
+
+    try self.srcprg.render(self.init.gpa);
+}
