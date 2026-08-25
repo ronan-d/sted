@@ -128,19 +128,6 @@ pub const StedWindow = extern struct {
         text_view.setCursorVisible(0);
         text_view.setMonospace(1);
 
-        {
-            const provider = gtk.CssProvider.new();
-            defer provider.unref();
-
-            const style_string = @embedFile("style.css");
-
-            provider.loadFromString(style_string);
-            text_view.as(gtk.Widget).getStyleContext().addProvider(
-                provider.as(gtk.StyleProvider),
-                gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
-            );
-        }
-
         win.core = try app.init.gpa.create(Core);
         win.core.* = try Core.new(app.init.*, text_view.getBuffer());
 

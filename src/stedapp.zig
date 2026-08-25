@@ -2,6 +2,7 @@ const std = @import("std");
 const Init = std.process.Init;
 
 const adw = @import("adw");
+const gdk = @import("gdk");
 const gio = @import("gio");
 const gobject = @import("gobject");
 const gtk = @import("gtk");
@@ -38,6 +39,23 @@ pub const StedApp = extern struct {
 
         fn activateImpl(app: *StedApp) callconv(.c) void {
             const win = StedWindow.new(app) catch unreachable;
+
+            if (gdk.Display.getDefault()) |display| {
+                const provider = gtk.CssProvider.new();
+                defer provider.unref();
+
+                const style_string = @embedFile("style.css");
+
+                provider.loadFromString(style_string);
+
+                gtk.StyleContext.addProviderForDisplay(
+                    display,
+                    provider.as(gtk.StyleProvider),
+                    gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+                );
+            } else {
+                unreachable;
+            }
 
             win.as(gtk.Window).present();
         }
