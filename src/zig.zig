@@ -391,7 +391,6 @@ pub const Node = union(enum) {
             .fn_decl => &[_]DynamicCommand{
                 .{
                     .display_text = "pub",
-                    .keycode = gdk.KEY_p,
                     .func = FnDecl.opaqueTogglePub,
                 },
             },

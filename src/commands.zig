@@ -1,11 +1,3 @@
-// A finite and even small set of commands.
-//
-// 1. Represent subsets conveniently.
-// 2. Functions that take in an element from the set and return:
-//    a. A human-readable string.
-//    b. A shortcut key (with the right GDK type).
-// 3. Elements can be either a ThreadCursor instruction or an arbitrary StedWindow method.
-
 const std = @import("std");
 
 pub const Command = enum {
@@ -32,44 +24,16 @@ pub const Command = enum {
             .replace => "Replace",
         };
     }
-
-    pub fn keycode(c: Command) c_uint {
-        const gdk = @import("gdk");
-
-        return switch (c) {
-            .go_right => gdk.KEY_l,
-            .go_up => gdk.KEY_k,
-            .go_left => gdk.KEY_h,
-            .go_down => gdk.KEY_j,
-            .insert_before => gdk.KEY_s,
-            .insert_after => gdk.KEY_d,
-            .insert_inside => gdk.KEY_i,
-            .remove => gdk.KEY_r,
-            .replace => gdk.KEY_o,
-        };
-    }
 };
 
 pub const all_commands = std.enums.values(Command);
 
 pub fn Map(T: type) type {
-    // Note: std.enums.EnumArray would be nice here, but we need the "extern".
-    return struct {
-        array: [all_commands.len]T,
-
-        pub fn at(self: @This(), c: Command) T {
-            return self.array[@intFromEnum(c)];
-        }
-
-        pub fn at_mut(self: *@This(), c: Command) *T {
-            return &self.array[@intFromEnum(c)];
-        }
-    };
+    return std.EnumArray(Command, T);
 }
 
 pub const DynamicCommand = struct {
     display_text: [:0]const u8,
-    keycode: c_uint,
     func: *const fn (*anyopaque) void,
 };
 

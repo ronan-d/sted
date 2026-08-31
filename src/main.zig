@@ -1,8 +1,6 @@
 const std = @import("std");
-const glib = @import("glib");
-const gobject = @import("gobject");
+
 const gio = @import("gio");
-const gtk = @import("gtk");
 
 const StedApp = @import("stedapp.zig").StedApp;
 

@@ -4,3 +4,28 @@ textview {
     color: #d4d4d4;
     background-color: #1e1e1e;
 }
+
+/* This is copied from _common.scss in the GTK source tree, except that it
+   applies to a shortcut class instead of applying to widgets of type
+   ShortcutLabel. */
+
+.shortcut {
+  border-spacing: 6px;
+  border-radius: 5px;
+}
+
+.shortcut > .keycap {
+  min-width: 20px;
+  min-height: 25px;
+  margin-top: 2px;
+  padding-bottom: 3px;
+  padding-left: 6px;
+  padding-right: 6px;
+
+  color: var(--card-fg-color);
+  background-color: var(--card-bg-color);
+  border: 1px solid;
+  border-color: var(--sidebar-border-color);
+  border-radius: 5px;
+  font-size: smaller;
+}

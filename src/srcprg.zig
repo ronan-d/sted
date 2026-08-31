@@ -4,11 +4,9 @@ const Allocator = std.mem.Allocator;
 
 const gtk = @import("gtk");
 
-const Tree = @import("Tree.zig");
-
-const Sink = @import("render.zig").Sink;
-
 const Frame = @import("Frame.zig");
+const Sink = @import("render.zig").Sink;
+const Tree = @import("Tree.zig");
 
 pub const Srcprg = struct {
     tree: Tree,

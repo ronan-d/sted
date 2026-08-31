@@ -1,5 +1,4 @@
 const std = @import("std");
-const Allocator = std.mem.Allocator;
 const Error = std.mem.Allocator.Error;
 
 const gtk = @import("gtk");

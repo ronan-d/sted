@@ -2,13 +2,12 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Error = Allocator.Error;
 
+const Sink = @import("render.zig").Sink;
+const DynamicCommand = @import("commands.zig").DynamicCommand;
+
 ptr: *anyopaque,
 vtable: *const VTable,
 replacement_offers: []const Offer,
-
-const Sink = @import("render.zig").Sink;
-
-const DynamicCommand = @import("commands.zig").DynamicCommand;
 
 pub const VTable = struct {
     childCount: *const fn (*anyopaque) usize,

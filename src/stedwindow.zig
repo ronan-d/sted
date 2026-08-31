@@ -1,5 +1,4 @@
 const std = @import("std");
-const Init = std.process.Init;
 const Allocator = std.mem.Allocator;
 
 const adw = @import("adw");
@@ -10,16 +9,17 @@ const gobject = @import("gobject");
 const gtk = @import("gtk");
 const pango = @import("pango");
 
-const Frame = @import("Frame.zig");
-
+const Callback = @import("Callback.zig");
+const commands = @import("commands.zig");
 const Core = @import("Core.zig");
-const ThreadCursor = @import("ThreadCursor.zig");
-const instruction = ThreadCursor.instruction;
+const Frame = @import("Frame.zig");
+const key_registry = @import("key_registry.zig");
+const shortcuts = @import("shortcuts.zig");
 const Srcprg = @import("srcprg.zig").Srcprg;
 const StedApp = @import("stedapp.zig").StedApp;
+const ThreadCursor = @import("ThreadCursor.zig");
+const instruction = ThreadCursor.instruction;
 const Tree = @import("Tree.zig");
-const commands = @import("commands.zig");
-const shortcuts = @import("shortcuts.zig");
 const ui_layout = @import("ui_layout.zig");
 
 pub const StedWindow = extern struct {
@@ -27,67 +27,6 @@ pub const StedWindow = extern struct {
     core: *Core,
 
     pub const Parent = adw.ApplicationWindow;
-
-    fn bind_cb_to_key(
-        T: type,
-        data: T,
-        cb: *const fn (*StedWindow, T) void,
-        keycode: c_uint,
-        gpa: Allocator,
-    ) Allocator.Error!*gtk.Shortcut {
-        // TODO perhaps adding some sort of name to the action will be needed for
-        // display later.
-
-        const trigger = gtk.KeyvalTrigger.new(keycode, .{});
-
-        const cb_action = blk: {
-            const Closure = struct {
-                cb: *const fn (*StedWindow, T) void,
-                data: T,
-            };
-
-            const closure = try gpa.create(Closure);
-            closure.* = Closure{ .cb = cb, .data = data };
-
-            const local_module = struct {
-                fn gtk_cb(wid: *gtk.Widget, _: ?*glib.Variant, opaque_ptr: ?*anyopaque) callconv(.c) c_int {
-                    const window: *StedWindow = gobject.ext.cast(StedWindow, wid).?;
-
-                    const ptr: *Closure = @ptrCast(@alignCast(opaque_ptr));
-
-                    ptr.cb(window, ptr.data);
-
-                    return 1;
-                }
-            };
-
-            const scf: gtk.ShortcutFunc = local_module.gtk_cb;
-
-            const cba = gtk.CallbackAction.new(scf, closure, null);
-
-            break :blk cba;
-        };
-
-        const shortcut = gtk.Shortcut.new(trigger.as(gtk.ShortcutTrigger), cb_action.as(gtk.ShortcutAction));
-
-        return shortcut;
-    }
-
-    fn bind_command_to_key(
-        comptime command: commands.Command,
-        keycode: c_uint,
-        gpa: Allocator,
-    ) Allocator.Error!*gtk.Shortcut {
-        const local_module = struct {
-            fn cb(self: *StedWindow, cmd: commands.Command) void {
-                self.srcprg.cursor.perform(self.pinit.io, cmd) catch unreachable;
-
-                self.refresh() catch unreachable;
-            }
-        };
-
-        return try bind_cb_to_key(commands.Command, command, local_module.cb, keycode, gpa);
-    }
 
     pub fn as(app: *StedWindow, comptime T: type) *T {
         return gobject.ext.as(T, app);
@@ -131,8 +70,6 @@ pub const StedWindow = extern struct {
         win.core = try app.init.gpa.create(Core);
         win.core.* = try Core.new(app.init.*, text_view.getBuffer());
 
-        win.as(gtk.Widget).addController(win.core.shortcut_pane.controller.as(gtk.EventController));
-
         text_view.as(gtk.Widget).setSizeRequest(
             4 * ui_layout.unit_in_pixels,
             4 * ui_layout.unit_in_pixels,
@@ -155,6 +92,27 @@ pub const StedWindow = extern struct {
         toolbar_view.setContent(paned.as(gtk.Widget));
 
         win.as(adw.ApplicationWindow).setContent(toolbar_view.as(gtk.Widget));
+
+        win.core.registerKeymapChangeCallbacks();
+
+        key_registry.setUpController(win.core, win.as(gtk.Widget));
+
+        for (commands.all_commands) |*c| {
+            const k = key_registry.keyForCommand(c.*);
+            if (c.* == .replace) {
+                const local_module = struct {
+                    fn cb(_: *Core, w: *StedWindow) void {
+                        w.replace();
+                    }
+                };
+
+                const callback = Callback.init(*StedWindow, local_module.cb, win);
+
+                try win.core.bindCommandToCallback(.replace, k, callback);
+            } else {
+                try win.core.bindInstruction(c, k);
+            }
+        }
 
         try win.core.refresh();
 
@@ -215,41 +173,6 @@ pub const StedWindow = extern struct {
         }
 
         return dialog;
-    }
-
-    pub fn addAction(
-        self: *Self,
-        comptime cb: *const fn (*Self) void,
-        name: [:0]const u8,
-    ) void {
-        const local_module = struct {
-            pub fn cb_wrapper(
-                _: *gio.SimpleAction,
-                _: *glib.Variant,
-                p_user_data: ?*anyopaque,
-            ) callconv(.c) void {
-                const p: *Self = @ptrCast(@alignCast(p_user_data));
-
-                cb(p);
-            }
-        };
-
-        const entry: gio.ActionEntry = .{
-            .f_name = name,
-            .f_activate = local_module.cb_wrapper,
-            .f_parameter_type = null,
-            .f_change_state = null,
-            .f_state = null,
-            .f_padding = undefined,
-        };
-
-        const intermediate_array = [_]gio.ActionEntry{entry};
-
-        self.as(gio.ActionMap).addActionEntries(
-            &intermediate_array,
-            intermediate_array.len,
-            @ptrCast(self),
-        );
     }
 
     pub fn replace(self: *Self) void {
@@ -355,11 +278,4 @@ fn close_dialog(d: *adw.Dialog) void {
     if (res != 1) {
         @panic("Failed to close dialog");
     }
-}
-
-fn local_method(c: commands.Command) ?fn (*StedWindow) void {
-    return switch (c) {
-        .replace => StedWindow.replace,
-        else => null,
-    };
 }

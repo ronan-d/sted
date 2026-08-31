@@ -3,11 +3,11 @@ const th = std.Thread;
 const Io = std.Io;
 const Allocator = std.mem.Allocator;
 
-const Tree = @import("Tree.zig");
 const commands = @import("commands.zig");
 const Command = commands.Command;
 const Mask = commands.Mask;
 const DynamicCommand = commands.DynamicCommand;
+const Tree = @import("Tree.zig");
 
 mutex: Io.Mutex,
 cond: Io.Condition,
@@ -253,15 +253,15 @@ fn mergeMasks(am: AboveMask, node: Tree) Mask {
 
     var ret: Mask = undefined;
 
-    ret.at_mut(.go_right).* = am.go_right;
-    ret.at_mut(.go_up).* = am.go_up;
-    ret.at_mut(.go_left).* = am.go_left;
-    ret.at_mut(.go_down).* = 0 < node.childCount();
-    ret.at_mut(.insert_before).* = am.insert_before;
-    ret.at_mut(.insert_after).* = am.insert_after;
-    ret.at_mut(.insert_inside).* = node.getMask().insert_at and node.childCount() == 0;
-    ret.at_mut(.remove).* = am.remove_cursor_node;
-    ret.at_mut(.replace).* = !is_replacing_useless;
+    ret.getPtr(.go_right).* = am.go_right;
+    ret.getPtr(.go_up).* = am.go_up;
+    ret.getPtr(.go_left).* = am.go_left;
+    ret.getPtr(.go_down).* = 0 < node.childCount();
+    ret.getPtr(.insert_before).* = am.insert_before;
+    ret.getPtr(.insert_after).* = am.insert_after;
+    ret.getPtr(.insert_inside).* = node.getMask().insert_at and node.childCount() == 0;
+    ret.getPtr(.remove).* = am.remove_cursor_node;
+    ret.getPtr(.replace).* = !is_replacing_useless;
 
     return ret;
 }
