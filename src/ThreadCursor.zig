@@ -229,6 +229,7 @@ fn traverse_dynamically(
             .insert_after => return .insert_after,
             .remove => return .remove_cursor_node,
             .replace => unreachable,
+            .enter_number_input_mode => unreachable,
         }
 
         self.report_completion(io, node, above_mask);

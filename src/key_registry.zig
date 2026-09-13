@@ -25,7 +25,9 @@ pub const Key = enum(c_uint) {
     a = 30,
     semicolon = 39,
     i = 23,
+    e = 18,
     r = 19,
+    u = 22,
     o = 24,
 
     pub fn xkbKeycode(k: Key) xkb_keycode {
