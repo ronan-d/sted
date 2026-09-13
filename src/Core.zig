@@ -185,3 +185,35 @@ fn refreshLabels(self: *Self, display: *gdk.Display) void {
         }
     }
 }
+
+const modes = struct {
+    const Mode = enum {
+        normal,
+        number_input,
+    };
+
+    const number_input_mode = struct {
+        fn onInsertText(
+            text_buffer: *gtk.TextBuffer,
+            _: *gtk.TextIter,
+            p_text: [*:0]u8,
+            p_len: c_int,
+            _: ?*void,
+        ) callconv(.c) void {
+            for (0..p_len) |i| {
+                if (!std.ascii.isDigit(p_text[i])) {
+                    gobject.signalStopEmissionByName(text_buffer, "insert-text");
+                    return;
+                }
+            }
+        }
+
+        fn switchToNumberInputMode(text_view: *gtk.TextView) void {
+            text_view.setEditable(1);
+            text_view.setCursorVisible(1);
+
+            const text_buffer = text_view.getBuffer();
+            _ = gtk.TextBuffer.signals.insert_text.connect(text_buffer, ?*void, onInsertText, null, .{});
+        }
+    };
+};
