@@ -176,5 +176,6 @@ pub fn keyForCommand(command: commands.Command) Key {
         .insert_inside => .i,
         .remove => .r,
         .replace => .o,
+        .enter_number_input_mode => .e,
     };
 }

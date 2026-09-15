@@ -186,13 +186,13 @@ fn refreshLabels(self: *Self, display: *gdk.Display) void {
     }
 }
 
-const modes = struct {
+pub const modes = struct {
     const Mode = enum {
         normal,
         number_input,
     };
 
-    const number_input_mode = struct {
+    pub const number_input_mode = struct {
         fn onInsertText(
             text_buffer: *gtk.TextBuffer,
             _: *gtk.TextIter,
@@ -208,7 +208,7 @@ const modes = struct {
             }
         }
 
-        fn switchToNumberInputMode(text_view: *gtk.TextView) void {
+        pub fn switchToNumberInputMode(text_view: *gtk.TextView) void {
             text_view.setEditable(1);
             text_view.setCursorVisible(1);
 

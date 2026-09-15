@@ -109,6 +109,15 @@ pub const StedWindow = extern struct {
                 const callback = Callback.init(*StedWindow, local_module.cb, win);
 
                 try win.core.bindCommandToCallback(.replace, k, callback);
+            } else if (c.* == .enter_number_input_mode) {
+                const local_module = struct {
+                    fn cb(_: *Core, w: *StedWindow) void {
+                        Core.modes.number_input_mode.switchToNumberInputMode(w.getTextView());
+                    }
+                };
+
+                const callback = Callback.init(*StedWindow, local_module.cb, win);
+                try win.core.bindCommandToCallback(.enter_number_input_mode, k, callback);
             } else {
                 try win.core.bindInstruction(c, k);
             }
@@ -182,6 +191,16 @@ pub const StedWindow = extern struct {
     }
 
     pub fn deinit(_: *Self) void {}
+
+    fn getTextView(self: *Self) *gtk.TextView {
+        const toolbar_view = gobject.ext.cast(adw.ToolbarView, self.as(adw.ApplicationWindow).getContent());
+
+        const paned = gobject.ext.cast(gtk.Paned, toolbar_view.getContent());
+
+        const text_view = gobject.ext.cast(gtk.TextView, paned.getStartChild());
+
+        return text_view;
+    }
 };
 
 fn button_cb_generic(
