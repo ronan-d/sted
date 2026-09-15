@@ -113,7 +113,6 @@ pub const StedWindow = extern struct {
                 const local_module = struct {
                     fn cb(_: *Core, w: *StedWindow) void {
                         Core.modes.number_input_mode.switchToNumberInputMode(w.getTextView());
-                        std.process.exit(0);
                     }
                 };
 
