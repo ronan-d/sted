@@ -202,7 +202,7 @@ pub const modes = struct {
         ) callconv(.c) void {
             for (0..@intCast(p_len)) |i| {
                 if (!std.ascii.isDigit(p_text[i])) {
-                    gobject.signalStopEmissionByName(text_buffer, "insert-text");
+                    gobject.signalStopEmissionByName(text_buffer.as(gobject.Object), "insert-text");
                     return;
                 }
             }

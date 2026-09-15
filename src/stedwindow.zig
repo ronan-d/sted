@@ -193,11 +193,11 @@ pub const StedWindow = extern struct {
     pub fn deinit(_: *Self) void {}
 
     fn getTextView(self: *Self) *gtk.TextView {
-        const toolbar_view = gobject.ext.cast(adw.ToolbarView, self.as(adw.ApplicationWindow).getContent());
+        const toolbar_view = gobject.ext.cast(adw.ToolbarView, self.as(adw.ApplicationWindow).getContent().?).?;
 
-        const paned = gobject.ext.cast(gtk.Paned, toolbar_view.getContent());
+        const paned = gobject.ext.cast(gtk.Paned, toolbar_view.getContent().?).?;
 
-        const text_view = gobject.ext.cast(gtk.TextView, paned.getStartChild());
+        const text_view = gobject.ext.cast(gtk.TextView, paned.getStartChild().?).?;
 
         return text_view;
     }
