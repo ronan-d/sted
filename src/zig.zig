@@ -371,18 +371,19 @@ pub const Node = union(enum) {
             .call,
             .str_lit,
             .try_expr,
+            => Tree.Mask{ .insert_at = false, .remove_at = false, .input_number = true },
             .expr_stmt,
             .fn_proto,
             .param_decl,
             .any_type,
             .fn_decl,
             .const_decl,
-            => Tree.Mask{ .insert_at = false, .remove_at = false },
+            => Tree.Mask{ .insert_at = false, .remove_at = false, .input_number = false },
             .arg_list,
             .op,
             .block,
             .param_list,
-            => Tree.Mask{ .insert_at = true, .remove_at = true },
+            => Tree.Mask{ .insert_at = true, .remove_at = true, .input_number = false },
         };
     }
 
