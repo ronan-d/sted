@@ -15,6 +15,7 @@ pub const Sink = struct {
     highlighter: Highlighter,
     active_tag: ?Tag,
     mode: Mode,
+    skip: bool,
 
     const indentation_unit = 2;
 
@@ -37,22 +38,37 @@ pub const Sink = struct {
             var end: gtk.TextIter = undefined;
             self.buf.getEndIter(&end);
 
-            if (self.cursor_start.getDeleted() == 0) {
-                self.buf.deleteMark(self.cursor_start);
+            switch (self.mode) {
+                .normal => {
+                    if (self.cursor_start.getDeleted() == 0) {
+                        self.buf.deleteMark(self.cursor_start);
+                    }
+                    self.buf.addMark(self.cursor_start, &end);
+                },
+                .edit => {
+                    self.skip = true;
+                    self.buf.placeCursor(end);
+                },
             }
-            self.buf.addMark(self.cursor_start, &end);
         }
     }
 
     pub fn endNode(self: *Self, node: *anyopaque) void {
         if (self.cursor == node) {
-            var start: gtk.TextIter = undefined;
-            self.buf.getIterAtMark(&start, self.cursor_start);
+            switch (self.mode) {
+                .normal => {
+                    var start: gtk.TextIter = undefined;
+                    self.buf.getIterAtMark(&start, self.cursor_start);
 
-            var end: gtk.TextIter = undefined;
-            self.buf.getEndIter(&end);
+                    var end: gtk.TextIter = undefined;
+                    self.buf.getEndIter(&end);
 
-            self.buf.applyTag(self.highlighter.get(.cursor), &start, &end);
+                    self.buf.applyTag(self.highlighter.get(.cursor), &start, &end);
+                },
+                .node => {
+                    self.skip = false;
+                },
+            }
         }
     }
 
@@ -62,6 +78,7 @@ pub const Sink = struct {
 
     pub fn clear(self: *Self) void {
         self.buf.setText("", 0);
+        self.skip = false;
     }
 
     pub fn increaseIndentation(self: *Self) void {
