@@ -108,6 +108,10 @@ pub const Sink = struct {
     }
 
     fn innerAppend(self: *Self, s: []const u8, tag: ?Tag) void {
+        if (self.skip) {
+            return;
+        }
+
         const last_arg: ?*anyopaque = null;
 
         var end: gtk.TextIter = undefined;
