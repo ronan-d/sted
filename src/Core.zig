@@ -227,4 +227,9 @@ pub const modes = struct {
 pub fn switchToTextInputCursor(self: *Self) !void {
     self.srcprg.sink.mode = .edit;
     try self.srcprg.render(self.init.gpa);
+
+    var cursor: gtk.TextIter = undefined;
+    self.srcprg.sink.buf.getIterAtMark(&cursor, self.srcprg.sink.cursor_start);
+
+    self.srcprg.sink.buf.placeCursor(cursor);
 }
