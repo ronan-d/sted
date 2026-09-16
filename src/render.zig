@@ -14,6 +14,7 @@ pub const Sink = struct {
     indentation_level: usize,
     highlighter: Highlighter,
     active_tag: ?Tag,
+    mode: Mode,
 
     const indentation_unit = 2;
 
@@ -27,6 +28,7 @@ pub const Sink = struct {
             .indentation_level = 0,
             .highlighter = highlight.init(buf),
             .active_tag = null,
+            .mode = Mode.normal,
         };
     }
 
@@ -110,4 +112,9 @@ pub const Sink = struct {
     }
 
     pub fn deinit(_: *Self) void {}
+};
+
+const Mode = enum {
+    normal,
+    edit,
 };
