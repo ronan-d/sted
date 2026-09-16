@@ -30,6 +30,7 @@ pub const Sink = struct {
             .highlighter = highlight.init(buf),
             .active_tag = null,
             .mode = Mode.normal,
+            .skip = false,
         };
     }
 
@@ -47,7 +48,7 @@ pub const Sink = struct {
                 },
                 .edit => {
                     self.skip = true;
-                    self.buf.placeCursor(end);
+                    self.buf.placeCursor(&end);
                 },
             }
         }
@@ -65,7 +66,7 @@ pub const Sink = struct {
 
                     self.buf.applyTag(self.highlighter.get(.cursor), &start, &end);
                 },
-                .node => {
+                .edit => {
                     self.skip = false;
                 },
             }
