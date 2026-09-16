@@ -38,17 +38,15 @@ pub const Sink = struct {
         if (self.cursor == node) {
             var end: gtk.TextIter = undefined;
             self.buf.getEndIter(&end);
+            if (self.cursor_start.getDeleted() == 0) {
+                self.buf.deleteMark(self.cursor_start);
+            }
+            self.buf.addMark(self.cursor_start, &end);
 
             switch (self.mode) {
-                .normal => {
-                    if (self.cursor_start.getDeleted() == 0) {
-                        self.buf.deleteMark(self.cursor_start);
-                    }
-                    self.buf.addMark(self.cursor_start, &end);
-                },
+                .normal => {},
                 .edit => {
                     self.skip = true;
-                    self.buf.placeCursor(&end);
                 },
             }
         }
