@@ -220,3 +220,8 @@ pub const modes = struct {
         }
     };
 };
+
+// TODO Precondition: the cursor is on an expression node.
+// Effect: Remove the node under the cursor, make the text view's cursor visible
+// and positioned at the spot where the expression node was.
+pub fn switchToTextInputCursor() void {}
