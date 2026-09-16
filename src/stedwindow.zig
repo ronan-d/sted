@@ -111,7 +111,8 @@ pub const StedWindow = extern struct {
                 try win.core.bindCommandToCallback(.replace, k, callback);
             } else if (c.* == .enter_number_input_mode) {
                 const local_module = struct {
-                    fn cb(_: *Core, w: *StedWindow) void {
+                    fn cb(core: *Core, w: *StedWindow) void {
+                        core.switchToTextInputCursor() catch unreachable;
                         Core.modes.number_input_mode.switchToNumberInputMode(w.getTextView());
                     }
                 };

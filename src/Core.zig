@@ -66,6 +66,7 @@ pub fn refresh(self: *Self) Allocator.Error!void {
 
     self.shortcut_pane.update(m);
 
+    self.srcprg.sink.mode = .normal;
     try self.srcprg.render(self.init.gpa);
 }
 
@@ -224,6 +225,7 @@ pub const modes = struct {
 // TODO Precondition: the cursor is on an expression node.
 // Effect: Remove the node under the cursor, make the text view's cursor visible
 // and positioned at the spot where the expression node was.
-pub fn switchToTextInputCursor() void {
-    const will_be_useful = gtk.TextBuffer.placeCursor;
+pub fn switchToTextInputCursor(self: *Self) !void {
+    self.srcprg.sink.mode = .edit;
+    try self.srcprg.render(self.init.gpa);
 }
