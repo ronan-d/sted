@@ -231,5 +231,5 @@ pub fn switchToTextInputCursor(self: *Self) !void {
     var cursor: gtk.TextIter = undefined;
     self.srcprg.sink.buf.getIterAtMark(&cursor, self.srcprg.sink.cursor_start);
 
-    self.srcprg.sink.buf.placeCursor(cursor);
+    self.srcprg.sink.buf.placeCursor(&cursor);
 }
