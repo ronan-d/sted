@@ -66,7 +66,6 @@ pub fn refresh(self: *Self) Allocator.Error!void {
 
     self.shortcut_pane.update(m);
 
-    self.srcprg.sink.mode = .normal;
     try self.srcprg.render(self.init.gpa);
 }
 
@@ -216,8 +215,8 @@ pub const modes = struct {
             text_view.setCursorVisible(1);
 
             // TODO the following lines apparently clear the buffer, we don't want that.
-            const text_buffer = text_view.getBuffer();
-            _ = gtk.TextBuffer.signals.insert_text.connect(text_buffer, ?*void, onInsertText, null, .{});
+            // const text_buffer = text_view.getBuffer();
+            // _ = gtk.TextBuffer.signals.insert_text.connect(text_buffer, ?*void, onInsertText, null, .{});
         }
     };
 };

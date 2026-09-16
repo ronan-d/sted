@@ -110,7 +110,10 @@ pub const Sink = struct {
 
     fn innerAppend(self: *Self, s: []const u8, tag: ?Tag) void {
         if (self.skip) {
+            std.debug.print("Filtered out: {s}\n", .{s});
             return;
+        } else {
+            std.debug.print("Goes through: {s}\n", .{s});
         }
 
         const last_arg: ?*anyopaque = null;
