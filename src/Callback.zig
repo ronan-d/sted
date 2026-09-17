@@ -7,7 +7,6 @@ const Self = @This();
 
 pub fn call(self: Self, core: *Core) !void {
     self.function(core, self.data);
-    try core.refresh();
 }
 
 pub fn init(T: type, function: fn (*Core, T) void, data: T) Self {

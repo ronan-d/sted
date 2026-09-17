@@ -82,6 +82,7 @@ fn instructionCallback(instruction: *const commands.Command) Callback {
     const local_module = struct {
         fn cb(c: *Self, cmd: *const commands.Command) !void {
             try c.srcprg.cursor.perform(c.init.io, cmd.*);
+            try c.refresh();
         }
 
         fn wrapper(c: *Self, cmd: *const commands.Command) void {
