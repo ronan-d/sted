@@ -210,14 +210,12 @@ pub const modes = struct {
         }
 
         pub fn switchToNumberInputMode(text_view: *gtk.TextView) void {
-            // TODO put the cursor at the right spot.
-
             text_view.setEditable(1);
             text_view.setCursorVisible(1);
 
             // TODO the following lines apparently clear the buffer, we don't want that.
-            // const text_buffer = text_view.getBuffer();
-            // _ = gtk.TextBuffer.signals.insert_text.connect(text_buffer, ?*void, onInsertText, null, .{});
+            const text_buffer = text_view.getBuffer();
+            _ = gtk.TextBuffer.signals.insert_text.connect(text_buffer, ?*void, onInsertText, null, .{});
         }
     };
 };
