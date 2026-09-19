@@ -20,7 +20,6 @@ shortcut_pane: shortcuts.Pane,
 k_reg: key_registry.Registry,
 global_commands: commands.Map(GlobalCommand),
 mode: modes.Mode,
-input_region_end: *gtk.TextMark, // Only used in number input mode
 
 const Self = @This();
 
