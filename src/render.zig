@@ -61,9 +61,9 @@ pub const Sink = struct {
     pub fn endNode(self: *Self, node: *anyopaque) void {
         if (self.cursor == node) {
             switch (self.mode_state) {
-                .normal => {
+                .normal => |x| {
                     var start: gtk.TextIter = undefined;
-                    self.buf.getIterAtMark(&start, self.cursor_start);
+                    self.buf.getIterAtMark(&start, x.cursor_start.?);
 
                     var end: gtk.TextIter = undefined;
                     self.buf.getEndIter(&end);
@@ -85,13 +85,13 @@ pub const Sink = struct {
         self.buf.setText("", 0);
 
         switch (self.mode_state) {
-            .normal => |x| {
+            .normal => |*x| {
                 if (x.cursor_start) |p| {
                     p.unref();
                 }
                 x.cursor_start = null;
             },
-            .edit => |x| {
+            .edit => |*x| {
                 if (x.input_start) |p| {
                     p.unref();
                 }
