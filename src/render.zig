@@ -14,7 +14,7 @@ pub const Sink = struct {
     indentation_level: usize,
     highlighter: Highlighter,
     active_tag: ?Tag,
-    mode: Mode,
+    mode_state: ModeState,
     skip: bool,
 
     const indentation_unit = 2;
@@ -29,7 +29,9 @@ pub const Sink = struct {
             .indentation_level = 0,
             .highlighter = highlight.init(buf),
             .active_tag = null,
-            .mode = Mode.normal,
+            .mode_state = ModeState{
+                .normal = .{ .cursor_start = null },
+            },
             .skip = false,
         };
     }
@@ -140,4 +142,12 @@ pub const Sink = struct {
 const Mode = enum {
     normal,
     edit,
+};
+
+const ModeState = union(Mode) {
+    normal: struct { cursor_start: ?*gtk.TextMark },
+    edit: struct {
+        input_start: ?*gtk.TextMark,
+        input_end: ?*gtk.TextMark,
+    },
 };
