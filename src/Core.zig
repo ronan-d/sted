@@ -231,10 +231,16 @@ pub fn switchToTextInputCursor(self: *Self) !void {
     self.srcprg.sink.mode_state = .{ .edit = .{ .input_start = null, .input_end = null } };
     try self.srcprg.render(self.init.gpa);
 
-    var cursor: gtk.TextIter = undefined;
-    self.srcprg.sink.buf.getIterAtMark(&cursor, self.srcprg.sink.cursor_start);
+    // TODO find better types
+    switch (self.srcprg.sink.mode_state) {
+        .edit => |x| {
+            var cursor: gtk.TextIter = undefined;
+            self.srcprg.sink.buf.getIterAtMark(&cursor, x.input_start.?);
 
-    self.srcprg.sink.buf.placeCursor(&cursor);
+            self.srcprg.sink.buf.placeCursor(&cursor);
+        },
+        .normal => unreachable,
+    }
 }
 
 pub fn switchToNormalMode(self: *Self) void {

@@ -24,7 +24,6 @@ pub const Sink = struct {
         return Self{
             .buf = buf,
             .cursor = undefined,
-            .cursor_start = gtk.TextMark.new("cursor-start", 1),
             .indentation_level = 0,
             .highlighter = highlight.init(buf),
             .active_tag = null,
@@ -39,15 +38,21 @@ pub const Sink = struct {
         if (self.cursor == node) {
             var end: gtk.TextIter = undefined;
             self.buf.getEndIter(&end);
-            if (self.cursor_start.getDeleted() == 0) {
-                self.buf.deleteMark(self.cursor_start);
-            }
-            self.buf.addMark(self.cursor_start, &end);
 
             switch (self.mode_state) {
-                .normal => {},
-                .edit => {
+                .normal => |*x| {
+                    std.debug.assert(x.cursor_start == null);
+
+                    x.cursor_start = self.buf.createMark("cursor-start", &end, 1);
+                },
+                .edit => |*x| {
                     self.skip = true;
+
+                    std.debug.assert(x.input_start == null);
+                    std.debug.assert(x.input_end == null);
+
+                    x.input_start = self.buf.createMark("input-start", &end, 1);
+                    x.input_end = self.buf.createMark("input-end", &end, 0);
                 },
             }
         }
@@ -55,7 +60,7 @@ pub const Sink = struct {
 
     pub fn endNode(self: *Self, node: *anyopaque) void {
         if (self.cursor == node) {
-            switch (self.mode) {
+            switch (self.mode_state) {
                 .normal => {
                     var start: gtk.TextIter = undefined;
                     self.buf.getIterAtMark(&start, self.cursor_start);
