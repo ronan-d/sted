@@ -149,7 +149,8 @@ fn onKeyPressed(keycode: xkb_keycode, core: *Core) !c_int {
         },
         .number_input => {
             if (keycode == Key.enter.xkbKeycode()) {
-                // todo
+                // TODO
+                return 1;
             } else {
                 return 0;
             }

@@ -10,7 +10,6 @@ const Tag = highlight.Tag;
 pub const Sink = struct {
     buf: *gtk.TextBuffer,
     cursor: *anyopaque,
-    cursor_start: *gtk.TextMark,
     indentation_level: usize,
     highlighter: Highlighter,
     active_tag: ?Tag,
@@ -45,7 +44,7 @@ pub const Sink = struct {
             }
             self.buf.addMark(self.cursor_start, &end);
 
-            switch (self.mode) {
+            switch (self.mode_state) {
                 .normal => {},
                 .edit => {
                     self.skip = true;
@@ -79,6 +78,26 @@ pub const Sink = struct {
 
     pub fn clear(self: *Self) void {
         self.buf.setText("", 0);
+
+        switch (self.mode_state) {
+            .normal => |x| {
+                if (x.cursor_start) |p| {
+                    p.unref();
+                }
+                x.cursor_start = null;
+            },
+            .edit => |x| {
+                if (x.input_start) |p| {
+                    p.unref();
+                }
+                x.input_start = null;
+                if (x.input_end) |p| {
+                    p.unref();
+                }
+                x.input_end = null;
+            },
+        }
+
         self.skip = false;
     }
 
