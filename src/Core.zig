@@ -19,6 +19,8 @@ srcprg: Srcprg,
 shortcut_pane: shortcuts.Pane,
 k_reg: key_registry.Registry,
 global_commands: commands.Map(GlobalCommand),
+mode: modes.Mode,
+input_region_end: *gtk.TextMark, // Only used in number input mode
 
 const Self = @This();
 
@@ -35,6 +37,7 @@ pub fn new(init: Init, text_buffer: *gtk.TextBuffer) !Self {
         ),
         .k_reg = registry,
         .global_commands = undefined,
+        .mode = .normal,
     };
 }
 
@@ -224,6 +227,8 @@ pub const modes = struct {
 // Effect: Remove the node under the cursor, make the text view's cursor visible
 // and positioned at the spot where the expression node was.
 pub fn switchToTextInputCursor(self: *Self) !void {
+    self.mode = .number_input;
+
     self.srcprg.sink.mode = .edit;
     try self.srcprg.render(self.init.gpa);
 
@@ -231,4 +236,12 @@ pub fn switchToTextInputCursor(self: *Self) !void {
     self.srcprg.sink.buf.getIterAtMark(&cursor, self.srcprg.sink.cursor_start);
 
     self.srcprg.sink.buf.placeCursor(&cursor);
+}
+
+pub fn switchToNormalMode(self: *Self) void {
+    // todo
+
+    self.mode = .normal;
+
+    self.srcprg.sink.mode = .normal;
 }

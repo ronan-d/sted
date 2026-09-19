@@ -29,6 +29,7 @@ pub const Key = enum(c_uint) {
     r = 19,
     u = 22,
     o = 24,
+    enter = 28,
 
     pub fn xkbKeycode(k: Key) xkb_keycode {
         // Why "+ 8"? "Historical reasons". See:
@@ -130,18 +131,29 @@ pub const Error = error{
 };
 
 fn onKeyPressed(keycode: xkb_keycode, core: *Core) !c_int {
-    if (core.k_reg.global_map.get(keycode)) |global_command| {
-        if (global_command.enabled) {
-            try global_command.callback.call(core);
-            return 1;
-        } else {
-            return 0;
-        }
-    } else if (core.k_reg.local_map.get(keycode)) |local_command| {
-        try local_command.callback.call(core);
-        return 1;
-    } else {
-        return 0;
+    switch (core.mode) {
+        .normal => {
+            if (core.k_reg.global_map.get(keycode)) |global_command| {
+                if (global_command.enabled) {
+                    try global_command.callback.call(core);
+                    return 1;
+                } else {
+                    return 0;
+                }
+            } else if (core.k_reg.local_map.get(keycode)) |local_command| {
+                try local_command.callback.call(core);
+                return 1;
+            } else {
+                return 0;
+            }
+        },
+        .number_input => {
+            if (keycode == Key.enter.xkbKeycode()) {
+                // todo
+            } else {
+                return 0;
+            }
+        },
     }
 }
 
