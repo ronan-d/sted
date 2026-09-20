@@ -244,7 +244,22 @@ pub fn switchToTextInputCursor(self: *Self) !void {
 }
 
 pub fn switchToNormalMode(self: *Self) void {
-    // todo
+    // The text the user inserted is between the input_start and input_end text
+    // marks.
+
+    switch (self.srcprg.sink.mode_state) {
+        .normal => unreachable,
+        .edit => |*x| {
+            var s: gtk.TextIter = undefined;
+            self.srcprg.sink.buf.getIterAtMark(&s, x.input_start.?);
+
+            var e: gtk.TextIter = undefined;
+            self.srcprg.sink.buf.getIterAtMark(&e, x.input_end.?);
+
+            const text = self.srcprg.sink.buf.getText(s, e, 1);
+            defer glib.free(text);
+        },
+    }
 
     self.mode = .normal;
 
