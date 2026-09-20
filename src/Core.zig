@@ -258,8 +258,6 @@ pub fn switchToNormalMode(self: *Self) void {
 
             const text = self.srcprg.sink.buf.getText(s, e, 1);
             defer glib.free(text);
-
-            const 
         },
     }
 
