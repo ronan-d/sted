@@ -91,7 +91,7 @@ pub fn eq(a: Self, b: Self) bool {
 pub const Mask = struct {
     insert_at: bool,
     remove_at: bool,
-    input_number: bool,
+    input_text: bool,
 };
 
 pub fn executeCommand(self: *Self, command: DynamicCommand) void {

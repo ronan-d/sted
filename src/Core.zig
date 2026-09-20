@@ -192,7 +192,7 @@ fn refreshLabels(self: *Self, display: *gdk.Display) void {
 pub const modes = struct {
     const Mode = enum {
         normal,
-        number_input,
+        text_input,
     };
 
     pub const number_input_mode = struct {
@@ -226,7 +226,7 @@ pub const modes = struct {
 // Effect: Remove the node under the cursor, make the text view's cursor visible
 // and positioned at the spot where the expression node was.
 pub fn switchToTextInputCursor(self: *Self) !void {
-    self.mode = .number_input;
+    self.mode = .text_input;
 
     self.srcprg.sink.mode_state = .{ .edit = .{ .input_start = null, .input_end = null } };
     try self.srcprg.render(self.init.gpa);
@@ -258,6 +258,8 @@ pub fn switchToNormalMode(self: *Self) void {
 
             const text = self.srcprg.sink.buf.getText(s, e, 1);
             defer glib.free(text);
+
+            const 
         },
     }
 
