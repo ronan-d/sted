@@ -195,7 +195,7 @@ pub const modes = struct {
         text_input,
     };
 
-    pub const number_input_mode = struct {
+    pub const text_input_mode = struct {
         fn onInsertText(
             text_buffer: *gtk.TextBuffer,
             _: *gtk.TextIter,
@@ -211,7 +211,7 @@ pub const modes = struct {
             }
         }
 
-        pub fn switchToNumberInputMode(text_view: *gtk.TextView) void {
+        pub fn switchToTextInputMode(text_view: *gtk.TextView) void {
             text_view.setEditable(1);
             text_view.setCursorVisible(1);
 

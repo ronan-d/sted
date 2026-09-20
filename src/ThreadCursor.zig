@@ -229,7 +229,7 @@ fn traverse_dynamically(
             .insert_after => return .insert_after,
             .remove => return .remove_cursor_node,
             .replace => unreachable,
-            .enter_number_input_mode => unreachable,
+            .enter_text_input_mode => unreachable,
         }
 
         self.report_completion(io, node, above_mask);
@@ -263,7 +263,7 @@ fn mergeMasks(am: AboveMask, node: Tree) Mask {
     ret.getPtr(.insert_inside).* = node.getMask().insert_at and node.childCount() == 0;
     ret.getPtr(.remove).* = am.remove_cursor_node;
     ret.getPtr(.replace).* = !is_replacing_useless;
-    ret.getPtr(.enter_number_input_mode).* = node.getMask().input_text;
+    ret.getPtr(.enter_text_input_mode).* = node.getMask().input_text;
 
     return ret;
 }

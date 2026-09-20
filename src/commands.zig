@@ -10,7 +10,7 @@ pub const Command = enum {
     insert_inside,
     remove,
     replace,
-    enter_number_input_mode,
+    enter_text_input_mode,
 
     pub fn displayText(c: Command) [:0]const u8 {
         return switch (c) {
@@ -23,7 +23,7 @@ pub const Command = enum {
             .insert_inside => "Insert inside",
             .remove => "Remove",
             .replace => "Replace",
-            .enter_number_input_mode => "Input number",
+            .enter_text_input_mode => "Input text",
         };
     }
 };

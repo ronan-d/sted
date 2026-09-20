@@ -109,16 +109,16 @@ pub const StedWindow = extern struct {
                 const callback = Callback.init(*StedWindow, local_module.cb, win);
 
                 try win.core.bindCommandToCallback(.replace, k, callback);
-            } else if (c.* == .enter_number_input_mode) {
+            } else if (c.* == .enter_text_input_mode) {
                 const local_module = struct {
                     fn cb(core: *Core, w: *StedWindow) void {
                         core.switchToTextInputCursor() catch unreachable;
-                        Core.modes.number_input_mode.switchToNumberInputMode(w.getTextView());
+                        Core.modes.text_input_mode.switchToTextInputMode(w.getTextView());
                     }
                 };
 
                 const callback = Callback.init(*StedWindow, local_module.cb, win);
-                try win.core.bindCommandToCallback(.enter_number_input_mode, k, callback);
+                try win.core.bindCommandToCallback(.enter_text_input_mode, k, callback);
             } else {
                 try win.core.bindInstruction(c, k);
             }
