@@ -113,7 +113,7 @@ pub const StedWindow = extern struct {
                 const local_module = struct {
                     fn cb(core: *Core, w: *StedWindow) void {
                         core.switchToTextInputCursor() catch unreachable;
-                        Core.modes.text_input_mode.switchToTextInputMode(w.getTextView());
+                        Core.modes.text_input_mode.switchToTextInputMode(w.getTextView(), w.core);
                     }
                 };
 

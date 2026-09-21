@@ -212,9 +212,10 @@ pub const modes = struct {
                     .edit => |x| x.input_start,
                 };
 
-                const first_iter = core.srcprg.sink.buf.getIterAtMark(mark);
+                var first_iter: gtk.TextIter = undefined;
+                core.srcprg.sink.buf.getIterAtMark(&first_iter, mark.?);
 
-                const character_is_ok = if (iter.equal(first_iter) == 0)
+                const character_is_ok = if (iter.equal(&first_iter) == 0)
                     std.ascii.isAlphabetic(p_text[i])
                 else
                     std.ascii.isAlphanumeric(p_text[i]);
@@ -232,7 +233,7 @@ pub const modes = struct {
 
             // TODO the following lines apparently clear the buffer, we don't want that.
             const text_buffer = text_view.getBuffer();
-            _ = gtk.TextBuffer.signals.insert_text.connect(text_buffer, *core, onInsertText, null, Self);
+            _ = gtk.TextBuffer.signals.insert_text.connect(text_buffer, *Self, onInsertText, core, .{});
         }
     };
 };
@@ -283,6 +284,6 @@ pub fn switchToNormalMode(self: *Self) void {
 
 // The text is supposed to follow the "usual" constraints on identifiers in
 // programming languages. As in Unicode TR31 for example.
-const Identifier = struct {
+pub const Identifier = struct {
     text: []u8,
 };

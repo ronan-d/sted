@@ -41,9 +41,9 @@ pub const DynamicCommand = struct {
     func: *const fn (*anyopaque) void,
 };
 
-const Func = union (enum) {
+const Func = union(enum) {
     parameterless: *const fn (*anyopaque) void,
-    from_identifier: *const fn (*anyopaque)
+    from_identifier: *const fn (*anyopaque, id: Core.Identifier) void,
 };
 
 pub const Mask = Map(bool);
