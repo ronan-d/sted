@@ -198,26 +198,41 @@ pub const modes = struct {
     pub const text_input_mode = struct {
         fn onInsertText(
             text_buffer: *gtk.TextBuffer,
-            _: *gtk.TextIter,
+            iter: *gtk.TextIter,
             p_text: [*:0]u8,
             p_len: c_int,
-            _: ?*void,
+            core: *Self,
         ) callconv(.c) void {
             for (0..@intCast(p_len)) |i| {
-                if (!std.ascii.isDigit(p_text[i])) {
+                // TODO compare the TextIter argument against input_start.
+                // Will be useful: gtk_text_iter_equal
+
+                const mark = switch (core.srcprg.sink.mode_state) {
+                    .normal => unreachable,
+                    .edit => |x| x.input_start,
+                };
+
+                const first_iter = core.srcprg.sink.buf.getIterAtMark(mark);
+
+                const character_is_ok = if (iter.equal(first_iter) == 0)
+                    std.ascii.isAlphabetic(p_text[i])
+                else
+                    std.ascii.isAlphanumeric(p_text[i]);
+
+                if (!character_is_ok) {
                     gobject.signalStopEmissionByName(text_buffer.as(gobject.Object), "insert-text");
                     return;
                 }
             }
         }
 
-        pub fn switchToTextInputMode(text_view: *gtk.TextView) void {
+        pub fn switchToTextInputMode(text_view: *gtk.TextView, core: *Self) void {
             text_view.setEditable(1);
             text_view.setCursorVisible(1);
 
             // TODO the following lines apparently clear the buffer, we don't want that.
             const text_buffer = text_view.getBuffer();
-            _ = gtk.TextBuffer.signals.insert_text.connect(text_buffer, ?*void, onInsertText, null, .{});
+            _ = gtk.TextBuffer.signals.insert_text.connect(text_buffer, *core, onInsertText, null, Self);
         }
     };
 };
@@ -265,3 +280,9 @@ pub fn switchToNormalMode(self: *Self) void {
 
     self.srcprg.sink.mode = .normal;
 }
+
+// The text is supposed to follow the "usual" constraints on identifiers in
+// programming languages. As in Unicode TR31 for example.
+const Identifier = struct {
+    text: []u8,
+};

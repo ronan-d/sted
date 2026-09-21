@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const Core = @import("Core.zig");
+
 pub const Command = enum {
     go_right,
     go_up,
@@ -37,6 +39,11 @@ pub fn Map(T: type) type {
 pub const DynamicCommand = struct {
     display_text: [:0]const u8,
     func: *const fn (*anyopaque) void,
+};
+
+const Func = union (enum) {
+    parameterless: *const fn (*anyopaque) void,
+    from_identifier: *const fn (*anyopaque)
 };
 
 pub const Mask = Map(bool);
