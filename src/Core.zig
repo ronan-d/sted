@@ -215,10 +215,10 @@ pub const modes = struct {
                 var first_iter: gtk.TextIter = undefined;
                 core.srcprg.sink.buf.getIterAtMark(&first_iter, mark.?);
 
-                const character_is_ok = if (iter.equal(&first_iter) == 0)
-                    std.ascii.isAlphabetic(p_text[i])
+                const character_is_ok = (if (iter.equal(&first_iter) == 0)
+                    &std.ascii.isAlphabetic
                 else
-                    std.ascii.isAlphanumeric(p_text[i]);
+                    &std.ascii.isAlphanumeric)(p_text[i]);
 
                 if (!character_is_ok) {
                     gobject.signalStopEmissionByName(text_buffer.as(gobject.Object), "insert-text");
