@@ -93,7 +93,3 @@ pub const Mask = struct {
     remove_at: bool,
     input_text: bool,
 };
-
-pub fn executeCommand(self: *Self, command: DynamicCommand) void {
-    command.func(self.ptr);
-}

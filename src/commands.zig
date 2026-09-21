@@ -38,7 +38,7 @@ pub fn Map(T: type) type {
 
 pub const DynamicCommand = struct {
     display_text: [:0]const u8,
-    func: *const fn (*anyopaque) void,
+    func: Func,
 };
 
 const Func = union(enum) {

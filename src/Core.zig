@@ -287,3 +287,7 @@ pub fn switchToNormalMode(self: *Self) void {
 pub const Identifier = struct {
     text: []u8,
 };
+
+pub fn executeCommand(self: *Self, command: commands.DynamicCommand) void {
+    command.func(self.ptr);
+}
