@@ -195,6 +195,11 @@ pub const modes = struct {
         text_input,
     };
 
+    const ModeState = union(Mode) {
+        normal,
+        text_input,
+    };
+
     pub const text_input_mode = struct {
         fn onInsertText(
             text_buffer: *gtk.TextBuffer,
@@ -289,5 +294,8 @@ pub const Identifier = struct {
 };
 
 pub fn executeCommand(self: *Self, command: commands.DynamicCommand) void {
-    command.func(self.ptr);
+    switch (command.func) {
+        .parameterless => todo,
+        .from_identifier => todo,
+    }
 }
