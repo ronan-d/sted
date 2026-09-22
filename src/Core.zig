@@ -197,7 +197,9 @@ pub const modes = struct {
 
     const ModeState = union(Mode) {
         normal,
-        text_input,
+        // In text input mode, we store the function we'll call when the
+        // identifier is completed.
+        text_input: *const fn (*anyopaque, id: Identifier) void,
     };
 
     pub const text_input_mode = struct {
