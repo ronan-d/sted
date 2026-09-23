@@ -19,7 +19,7 @@ srcprg: Srcprg,
 shortcut_pane: shortcuts.Pane,
 k_reg: key_registry.Registry,
 global_commands: commands.Map(GlobalCommand),
-mode: modes.Mode,
+mode_state: modes.ModeState,
 
 const Self = @This();
 
@@ -297,7 +297,10 @@ pub const Identifier = struct {
 
 pub fn executeCommand(self: *Self, command: commands.DynamicCommand) void {
     switch (command.func) {
-        .parameterless => todo,
-        .from_identifier => todo,
+        .parameterless => |f| f(self.srcprg.cursor.cursor_pos.ptr),
+        .from_identifier => {
+            // todo
+            self.
+        },
     }
 }
