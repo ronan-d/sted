@@ -68,7 +68,7 @@ pub const StedWindow = extern struct {
         text_view.setMonospace(1);
 
         win.core = try app.init.gpa.create(Core);
-        win.core.* = try Core.new(app.init.*, text_view.getBuffer());
+        win.core.* = try Core.new(app.init.*, text_view);
 
         text_view.as(gtk.Widget).setSizeRequest(
             4 * ui_layout.unit_in_pixels,
@@ -112,7 +112,7 @@ pub const StedWindow = extern struct {
             } else if (c.* == .enter_text_input_mode) {
                 const local_module = struct {
                     fn cb(core: *Core, w: *StedWindow) void {
-                        core.switchToTextInputCursor() catch unreachable;
+                        core.switchToTextInputMode() catch unreachable;
                         Core.modes.text_input_mode.switchToTextInputMode(w.getTextView(), w.core);
                     }
                 };

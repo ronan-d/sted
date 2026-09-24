@@ -20,10 +20,11 @@ shortcut_pane: shortcuts.Pane,
 k_reg: key_registry.Registry,
 global_commands: commands.Map(GlobalCommand),
 mode_state: modes.ModeState,
+text_view: *gtk.TextView,
 
 const Self = @This();
 
-pub fn new(init: Init, text_buffer: *gtk.TextBuffer) !Self {
+pub fn new(init: Init, text_view: *gtk.TextView) !Self {
     const registry = try key_registry.Registry.init(init.gpa);
 
     return Self{
@@ -32,11 +33,12 @@ pub fn new(init: Init, text_buffer: *gtk.TextBuffer) !Self {
         .srcprg = try Srcprg.new(
             init.io,
             init.gpa,
-            text_buffer,
+            text_view.getBuffer(),
         ),
         .k_reg = registry,
         .global_commands = undefined,
-        .mode = .normal,
+        .mode_state = .normal,
+        .text_view = text_view,
     };
 }
 
@@ -199,7 +201,7 @@ pub const modes = struct {
         normal,
         // In text input mode, we store the function we'll call when the
         // identifier is completed.
-        text_input: *const fn (*anyopaque, id: Identifier) void,
+        text_input: IdFunc,
     };
 
     pub const text_input_mode = struct {
@@ -238,7 +240,6 @@ pub const modes = struct {
             text_view.setEditable(1);
             text_view.setCursorVisible(1);
 
-            // TODO the following lines apparently clear the buffer, we don't want that.
             const text_buffer = text_view.getBuffer();
             _ = gtk.TextBuffer.signals.insert_text.connect(text_buffer, *Self, onInsertText, core, .{});
         }
@@ -248,8 +249,8 @@ pub const modes = struct {
 // TODO Precondition: the cursor is on an expression node.
 // Effect: Remove the node under the cursor, make the text view's cursor visible
 // and positioned at the spot where the expression node was.
-pub fn switchToTextInputCursor(self: *Self) !void {
-    self.mode = .text_input;
+pub fn switchToTextInputMode(self: *Self, f: IdFunc) !void {
+    self.mode_state = .{ .normal = f };
 
     self.srcprg.sink.mode_state = .{ .edit = .{ .input_start = null, .input_end = null } };
     try self.srcprg.render(self.init.gpa);
@@ -298,9 +299,10 @@ pub const Identifier = struct {
 pub fn executeCommand(self: *Self, command: commands.DynamicCommand) void {
     switch (command.func) {
         .parameterless => |f| f(self.srcprg.cursor.cursor_pos.ptr),
-        .from_identifier => {
-            // todo
-            self.
+        .from_identifier => |f| {
+            self.switchToTextInputMode(f);
         },
     }
 }
+
+pub const IdFunc = *const fn (*anyopaque, id: Identifier) void;
