@@ -115,7 +115,7 @@ pub fn bindInstruction(core: *Self, instruction: *const commands.Command, key: k
 fn bindLocal(core: *Self, command: *const commands.DynamicCommand) !void {
     const local_module = struct {
         fn cb(c: *Self, cmd: *const commands.DynamicCommand) void {
-            c.srcprg.cursor.cursor_pos.executeCommand(cmd.*);
+            c.executeCommand(cmd.*) catch unreachable;
         }
     };
 
@@ -192,7 +192,7 @@ fn refreshLabels(self: *Self, display: *gdk.Display) void {
 }
 
 pub const modes = struct {
-    const Mode = enum {
+    pub const Mode = enum {
         normal,
         text_input,
     };
@@ -250,7 +250,7 @@ pub const modes = struct {
 // Effect: Remove the node under the cursor, make the text view's cursor visible
 // and positioned at the spot where the expression node was.
 pub fn switchToTextInputMode(self: *Self, f: IdFunc) !void {
-    self.mode_state = .{ .normal = f };
+    self.mode_state = .{ .text_input = f };
 
     self.srcprg.sink.mode_state = .{ .edit = .{ .input_start = null, .input_end = null } };
     try self.srcprg.render(self.init.gpa);
@@ -267,7 +267,7 @@ pub fn switchToTextInputMode(self: *Self, f: IdFunc) !void {
     }
 }
 
-pub fn switchToNormalMode(self: *Self) void {
+pub fn switchToNormalMode(self: *Self, f: IdFunc) void {
     // The text the user inserted is between the input_start and input_end text
     // marks.
 
@@ -296,11 +296,11 @@ pub const Identifier = struct {
     text: []u8,
 };
 
-pub fn executeCommand(self: *Self, command: commands.DynamicCommand) void {
+pub fn executeCommand(self: *Self, command: commands.DynamicCommand) !void {
     switch (command.func) {
         .parameterless => |f| f(self.srcprg.cursor.cursor_pos.ptr),
         .from_identifier => |f| {
-            self.switchToTextInputMode(f);
+            try self.switchToTextInputMode(f);
         },
     }
 }

@@ -3,6 +3,7 @@ const Error = std.mem.Allocator.Error;
 
 const gtk = @import("gtk");
 
+const Core = @import("Core.zig");
 const highlight = @import("highlight.zig");
 const Highlighter = highlight.Highlighter;
 const Tag = highlight.Tag;
@@ -163,15 +164,14 @@ pub const Sink = struct {
     pub fn deinit(_: *Self) void {}
 };
 
-const Mode = enum {
-    normal,
-    edit,
-};
+const Mode = Core.modes.Mode;
 
-const ModeState = union(Mode) {
-    normal: struct { cursor_start: ?*gtk.TextMark },
-    edit: struct {
-        input_start: ?*gtk.TextMark,
-        input_end: ?*gtk.TextMark,
-    },
-};
+fn ModeState(comptime mode: Mode) type {
+    return switch (mode) {
+        .normal => struct { cursor_start: ?*gtk.TextMark },
+        .text_input => struct {
+            input_start: ?*gtk.TextMark,
+            input_end: ?*gtk.TextMark,
+        },
+    };
+}

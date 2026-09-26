@@ -131,7 +131,7 @@ pub const Error = error{
 };
 
 fn onKeyPressed(keycode: xkb_keycode, core: *Core) !c_int {
-    switch (core.mode) {
+    switch (core.mode_state) {
         .normal => {
             if (core.k_reg.global_map.get(keycode)) |global_command| {
                 if (global_command.enabled) {
@@ -147,7 +147,7 @@ fn onKeyPressed(keycode: xkb_keycode, core: *Core) !c_int {
                 return 0;
             }
         },
-        .text_input => {
+        .text_input => |f| {
             if (keycode == Key.enter.xkbKeycode()) {
                 // TODO
                 return 1;
