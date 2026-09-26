@@ -310,3 +310,8 @@ pub fn executeCommand(self: *Self, command: commands.DynamicCommand) !void {
 }
 
 pub const IdFunc = *const fn (*anyopaque, id: Identifier) void;
+
+pub const EditableRegion = struct {
+    start: *gtk.TextMark,
+    end: *gtk.TextMark,
+};

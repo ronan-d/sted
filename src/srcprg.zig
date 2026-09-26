@@ -22,7 +22,7 @@ pub const Srcprg = struct {
         sink.deinit();
     }
 
-    pub fn new(io: Io, gpa: Allocator, buf: *gtk.TextBuffer) !Self {
+    pub fn new(io: Io, gpa: Allocator) !Self {
         const x = try @import("zig.zig").get_sample(gpa);
 
         return Self{

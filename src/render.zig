@@ -1,5 +1,6 @@
 const std = @import("std");
-const Error = std.mem.Allocator.Error;
+const Allocator = std.mem.Allocator;
+const Error = Allocator.Error;
 
 const gtk = @import("gtk");
 
@@ -7,6 +8,7 @@ const Core = @import("Core.zig");
 const highlight = @import("highlight.zig");
 const Highlighter = highlight.Highlighter;
 const Tag = highlight.Tag;
+const Tree = @import("Tree.zig");
 
 pub const Sink = struct {
     buf: *gtk.TextBuffer,
@@ -15,12 +17,13 @@ pub const Sink = struct {
     highlighter: Highlighter,
     active_tag: ?Tag,
     skip: bool,
+    mode_state: ModeState,
 
     const indentation_unit = 2;
 
     const Self = @This();
 
-    pub fn init(buf: *gtk.TextBuffer, cursor: *anyopaque) Self {
+    pub fn init(buf: *gtk.TextBuffer, cursor: *anyopaque, mode: Mode) Self {
         return Self{
             .buf = buf,
             .cursor = cursor,
@@ -28,6 +31,9 @@ pub const Sink = struct {
             .highlighter = highlight.init(buf),
             .active_tag = null,
             .skip = false,
+            .mode_state = switch (mode) {
+                .normal => .{ .normal = .{ .cursor_start = null } },
+            },
         };
     }
 
@@ -162,12 +168,23 @@ pub const Sink = struct {
 
 const Mode = Core.modes.Mode;
 
-pub fn ModeState(comptime mode: Mode) type {
-    return switch (mode) {
-        .normal => struct { cursor_start: ?*gtk.TextMark },
-        .text_input => struct {
-            input_start: ?*gtk.TextMark,
-            input_end: ?*gtk.TextMark,
-        },
-    };
+const ModeState = union(Mode) {
+    normal: struct { cursor_start: ?*gtk.TextMark },
+    text_input: struct {
+        input_start: ?*gtk.TextMark,
+        input_end: ?*gtk.TextMark,
+    },
+};
+
+pub fn renderNormal(buf: *gtk.Buffer, root: Tree, cursor_pos: Tree, gpa: Allocator) !void {
+    const sink = Sink.init(buf, cursor_pos.ptr);
+    defer sink.deinit();
+
+    try root.render(gpa, sink);
+}
+
+pub fn renderTextInput(buf: *gtk.Buffer, root: Tree, cursor_pos: Tree, gpa: Allocator) !Core.EditableRegion {
+    const sink = Sink.init(buf, cursor_pos.ptr);
+
+    defer sink.deinit();
 }
