@@ -14,7 +14,6 @@ pub const Sink = struct {
     indentation_level: usize,
     highlighter: Highlighter,
     active_tag: ?Tag,
-    mode_state: ModeState,
     skip: bool,
 
     const indentation_unit = 2;
@@ -28,9 +27,6 @@ pub const Sink = struct {
             .indentation_level = 0,
             .highlighter = highlight.init(buf),
             .active_tag = null,
-            .mode_state = ModeState{
-                .normal = .{ .cursor_start = null },
-            },
             .skip = false,
         };
     }
@@ -166,7 +162,7 @@ pub const Sink = struct {
 
 const Mode = Core.modes.Mode;
 
-fn ModeState(comptime mode: Mode) type {
+pub fn ModeState(comptime mode: Mode) type {
     return switch (mode) {
         .normal => struct { cursor_start: ?*gtk.TextMark },
         .text_input => struct {

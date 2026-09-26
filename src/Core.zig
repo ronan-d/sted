@@ -10,6 +10,7 @@ const gtk = @import("gtk");
 const Callback = @import("Callback.zig");
 const commands = @import("commands.zig");
 const key_registry = @import("key_registry.zig");
+const render = @import("render.zig");
 const shortcuts = @import("shortcuts.zig");
 const Srcprg = @import("srcprg.zig").Srcprg;
 const ui_layout = @import("ui_layout.zig");
@@ -201,7 +202,10 @@ pub const modes = struct {
         normal,
         // In text input mode, we store the function we'll call when the
         // identifier is completed.
-        text_input: IdFunc,
+        text_input: struct {
+            f: IdFunc,
+            render: render.ModeState(.text_input),
+        },
     };
 
     pub const text_input_mode = struct {
