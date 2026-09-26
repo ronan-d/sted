@@ -20,10 +20,10 @@ pub const Sink = struct {
 
     const Self = @This();
 
-    pub fn init(buf: *gtk.TextBuffer) Self {
+    pub fn init(buf: *gtk.TextBuffer, cursor: *anyopaque) Self {
         return Self{
             .buf = buf,
-            .cursor = undefined,
+            .cursor = cursor,
             .indentation_level = 0,
             .highlighter = highlight.init(buf),
             .active_tag = null,

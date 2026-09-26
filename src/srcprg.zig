@@ -11,15 +11,15 @@ const Tree = @import("Tree.zig");
 pub const Srcprg = struct {
     tree: Tree,
     cursor: *ThreadCursor,
-    sink: Sink,
 
     const Self = @This();
 
-    pub fn render(self: *Self, gpa: Allocator) !void {
-        self.sink.clear();
+    pub fn render(self: *Self, buf: *gtk.TextBuffer, gpa: Allocator) !void {
+        const sink = Sink.init(buf, self.cursor.cursor_pos.ptr);
 
-        self.sink.cursor = self.cursor.cursor_pos.ptr;
-        try self.tree.render(gpa, &self.sink);
+        try self.tree.render(gpa, &sink);
+
+        sink.deinit();
     }
 
     pub fn new(io: Io, gpa: Allocator, buf: *gtk.TextBuffer) !Self {
@@ -35,7 +35,6 @@ pub const Srcprg = struct {
 
                 break :blk p;
             },
-            .sink = Sink.init(buf),
         };
     }
 
