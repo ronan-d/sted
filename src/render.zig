@@ -10,7 +10,7 @@ const Highlighter = highlight.Highlighter;
 const Tag = highlight.Tag;
 const Tree = @import("Tree.zig");
 
-pub const Sink = struct {
+const Sink = struct {
     buf: *gtk.TextBuffer,
     cursor: *anyopaque,
     indentation_level: usize,
@@ -163,7 +163,26 @@ pub const Sink = struct {
         }
     }
 
-    pub fn deinit(_: *Self) void {}
+    pub fn deinit(self: *Self) void {
+        switch (self.mode_state) {
+            .normal => |*x| {
+                if (x.cursor_start) |p| {
+                    p.unref();
+                }
+                x.cursor_start = null;
+            },
+            .edit => |*x| {
+                if (x.input_start) |p| {
+                    p.unref();
+                }
+                x.input_start = null;
+                if (x.input_end) |p| {
+                    p.unref();
+                }
+                x.input_end = null;
+            },
+        }
+    }
 };
 
 const Mode = Core.modes.Mode;
@@ -180,11 +199,28 @@ pub fn renderNormal(buf: *gtk.Buffer, root: Tree, cursor_pos: Tree, gpa: Allocat
     const sink = Sink.init(buf, cursor_pos.ptr);
     defer sink.deinit();
 
+    sink.mode_state = .{ .normal = null };
+
     try root.render(gpa, sink);
 }
 
 pub fn renderTextInput(buf: *gtk.Buffer, root: Tree, cursor_pos: Tree, gpa: Allocator) !Core.EditableRegion {
     const sink = Sink.init(buf, cursor_pos.ptr);
-
     defer sink.deinit();
+
+    sink.mode_state = .{ .text_input = .{ .input_start = null, .input_end = null } };
+
+    try root.render(gpa, sink);
+
+    return switch (sink.mode_state) {
+        .normal => unreachable,
+        .text_input => |x| blk: {
+            const start = x.input_start;
+            x.input_start = null;
+            const end = x.input_end;
+            x.input_end = null;
+
+            break :blk .{ .start = start.?, .end = end.? };
+        },
+    };
 }

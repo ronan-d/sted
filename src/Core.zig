@@ -34,7 +34,6 @@ pub fn new(init: Init, text_view: *gtk.TextView) !Self {
         .srcprg = try Srcprg.new(
             init.io,
             init.gpa,
-            text_view.getBuffer(),
         ),
         .k_reg = registry,
         .global_commands = undefined,
@@ -71,7 +70,12 @@ pub fn refresh(self: *Self) Allocator.Error!void {
 
     self.shortcut_pane.update(m);
 
-    try self.srcprg.render(self.init.gpa);
+    try render.renderNormal(
+        self.text_view.getBuffer(),
+        self.srcprg.tree,
+        self.srcprg.cursor.cursor_pos,
+        self.init.gpa,
+    );
 }
 
 const LocalCommand = struct {
@@ -204,7 +208,7 @@ pub const modes = struct {
         // identifier is completed.
         text_input: struct {
             f: IdFunc,
-            render: render.ModeState(.text_input),
+            editable_region: EditableRegion,
         },
     };
 
@@ -254,10 +258,9 @@ pub const modes = struct {
 // Effect: Remove the node under the cursor, make the text view's cursor visible
 // and positioned at the spot where the expression node was.
 pub fn switchToTextInputMode(self: *Self, f: IdFunc) !void {
-    self.mode_state = .{ .text_input = f };
+    const editable_region = try render.renderTextInput(self.text_view.getBuffer(), self.init.gpa);
 
-    self.srcprg.sink.mode_state = .{ .edit = .{ .input_start = null, .input_end = null } };
-    try self.srcprg.render(self.init.gpa);
+    self.mode_state = .{ .text_input = .{ .f = f, .editable_region = editable_region } };
 
     // TODO find better types
     switch (self.srcprg.sink.mode_state) {
