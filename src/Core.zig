@@ -268,27 +268,27 @@ pub fn switchToTextInputMode(self: *Self, f: IdFunc) !void {
     self.srcprg.sink.buf.placeCursor(&cursor);
 }
 
-pub fn switchToNormalMode(self: *Self, f: IdFunc) void {
+pub fn switchToNormalMode(self: *Self, f: IdFunc, editable_region: EditableRegion) void {
     // The text the user inserted is between the input_start and input_end text
     // marks.
 
-    switch (self.srcprg.sink.mode_state) {
-        .normal => unreachable,
-        .edit => |*x| {
-            var s: gtk.TextIter = undefined;
-            self.srcprg.sink.buf.getIterAtMark(&s, x.input_start.?);
+    {
+        var s: gtk.TextIter = undefined;
+        self.srcprg.sink.buf.getIterAtMark(&s, editable_region.start);
 
-            var e: gtk.TextIter = undefined;
-            self.srcprg.sink.buf.getIterAtMark(&e, x.input_end.?);
+        var e: gtk.TextIter = undefined;
+        self.srcprg.sink.buf.getIterAtMark(&e, editable_region.end);
 
-            const text = self.srcprg.sink.buf.getText(s, e, 1);
-            defer glib.free(text);
-        },
+        const text = self.srcprg.sink.buf.getText(s, e, 1);
+
+        const id = Identifier{ .text = text };
+
+        f(self.srcprg.cursor.cursor_pos.ptr, id);
+
+        defer glib.free(text);
     }
 
     self.mode = .normal;
-
-    self.srcprg.sink.mode = .normal;
 }
 
 // The text is supposed to follow the "usual" constraints on identifiers in
