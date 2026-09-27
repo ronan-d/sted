@@ -147,9 +147,9 @@ fn onKeyPressed(keycode: xkb_keycode, core: *Core) !c_int {
                 return 0;
             }
         },
-        .text_input => |f| {
+        .text_input => |x| {
             if (keycode == Key.enter.xkbKeycode()) {
-                // TODO
+                core.switchToNormalMode(x.f, x.editable_region);
                 return 1;
             } else {
                 return 0;

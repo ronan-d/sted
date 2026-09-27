@@ -392,7 +392,7 @@ pub const Node = union(enum) {
             .fn_decl => &[_]DynamicCommand{
                 .{
                     .display_text = "pub",
-                    .func = FnDecl.opaqueTogglePub,
+                    .func = .{ .parameterless = FnDecl.opaqueTogglePub },
                 },
             },
             else => &[_]DynamicCommand{},

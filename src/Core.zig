@@ -213,37 +213,6 @@ pub const modes = struct {
     };
 
     pub const text_input_mode = struct {
-        fn onInsertText(
-            text_buffer: *gtk.TextBuffer,
-            iter: *gtk.TextIter,
-            p_text: [*:0]u8,
-            p_len: c_int,
-            core: *Self,
-        ) callconv(.c) void {
-            for (0..@intCast(p_len)) |i| {
-                // TODO compare the TextIter argument against input_start.
-                // Will be useful: gtk_text_iter_equal
-
-                const mark = switch (core.srcprg.sink.mode_state) {
-                    .normal => unreachable,
-                    .edit => |x| x.input_start,
-                };
-
-                var first_iter: gtk.TextIter = undefined;
-                core.srcprg.sink.buf.getIterAtMark(&first_iter, mark.?);
-
-                const character_is_ok = (if (iter.equal(&first_iter) == 0)
-                    &std.ascii.isAlphabetic
-                else
-                    &std.ascii.isAlphanumeric)(p_text[i]);
-
-                if (!character_is_ok) {
-                    gobject.signalStopEmissionByName(text_buffer.as(gobject.Object), "insert-text");
-                    return;
-                }
-            }
-        }
-
         pub fn switchToTextInputMode(text_view: *gtk.TextView, core: *Self) void {
             text_view.setEditable(1);
             text_view.setCursorVisible(1);
@@ -254,18 +223,59 @@ pub const modes = struct {
     };
 };
 
-// TODO Precondition: the cursor is on an expression node.
+fn onInsertText(
+    text_buffer: *gtk.TextBuffer,
+    iter: *gtk.TextIter,
+    p_text: [*:0]u8,
+    p_len: c_int,
+    core: *Self,
+) callconv(.c) void {
+    for (0..@intCast(p_len)) |i| {
+        // TODO compare the TextIter argument against input_start.
+        // Will be useful: gtk_text_iter_equal
+
+        const mark = switch (core.mode_state) {
+            .normal => unreachable,
+            .text_input => |x| x.editable_region.start,
+        };
+
+        var first_iter: gtk.TextIter = undefined;
+        text_buffer.getIterAtMark(&first_iter, mark);
+
+        const character_is_ok = (if (iter.equal(&first_iter) == 0)
+            &std.ascii.isAlphabetic
+        else
+            &std.ascii.isAlphanumeric)(p_text[i]);
+
+        if (!character_is_ok) {
+            gobject.signalStopEmissionByName(text_buffer.as(gobject.Object), "insert-text");
+            return;
+        }
+    }
+} // TODO Precondition: the cursor is on an expression node.
 // Effect: Remove the node under the cursor, make the text view's cursor visible
 // and positioned at the spot where the expression node was.
 pub fn switchToTextInputMode(self: *Self, f: IdFunc) !void {
-    const editable_region = try render.renderTextInput(self.text_view.getBuffer(), self.init.gpa);
+    self.text_view.setEditable(1);
+    self.text_view.setCursorVisible(1);
+
+    const editable_region = try render.renderTextInput(
+        self.text_view.getBuffer(),
+        self.srcprg.tree,
+        self.srcprg.cursor.cursor_pos,
+        self.init.gpa,
+    );
 
     self.mode_state = .{ .text_input = .{ .f = f, .editable_region = editable_region } };
 
-    var cursor: gtk.TextIter = undefined;
-    self.srcprg.sink.buf.getIterAtMark(&cursor, editable_region.start);
+    const buf = self.text_view.getBuffer();
 
-    self.srcprg.sink.buf.placeCursor(&cursor);
+    _ = gtk.TextBuffer.signals.insert_text.connect(buf, *Self, onInsertText, self, .{});
+
+    var cursor: gtk.TextIter = undefined;
+    buf.getIterAtMark(&cursor, editable_region.start);
+
+    buf.placeCursor(&cursor);
 }
 
 pub fn switchToNormalMode(self: *Self, f: IdFunc, editable_region: EditableRegion) void {
@@ -273,22 +283,24 @@ pub fn switchToNormalMode(self: *Self, f: IdFunc, editable_region: EditableRegio
     // marks.
 
     {
+        const buf = self.text_view.getBuffer();
+
         var s: gtk.TextIter = undefined;
-        self.srcprg.sink.buf.getIterAtMark(&s, editable_region.start);
+        buf.getIterAtMark(&s, editable_region.start);
 
         var e: gtk.TextIter = undefined;
-        self.srcprg.sink.buf.getIterAtMark(&e, editable_region.end);
+        buf.getIterAtMark(&e, editable_region.end);
 
-        const text = self.srcprg.sink.buf.getText(s, e, 1);
+        const text = buf.getText(&s, &e, 1);
 
-        const id = Identifier{ .text = text };
+        const id = Identifier{ .text = std.mem.span(text) };
 
         f(self.srcprg.cursor.cursor_pos.ptr, id);
 
         defer glib.free(text);
     }
 
-    self.mode = .normal;
+    self.mode_state = .normal;
 }
 
 // The text is supposed to follow the "usual" constraints on identifiers in

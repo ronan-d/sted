@@ -33,6 +33,7 @@ pub const Sink = struct {
             .skip = false,
             .mode_state = switch (mode) {
                 .normal => .{ .normal = .{ .cursor_start = null } },
+                .text_input => .{ .text_input = .{ .input_start = null, .input_end = null } },
             },
         };
     }
@@ -48,7 +49,7 @@ pub const Sink = struct {
 
                     x.cursor_start = self.buf.createMark("cursor-start", &end, 1);
                 },
-                .edit => |*x| {
+                .text_input => |*x| {
                     self.skip = true;
 
                     std.debug.assert(x.input_start == null);
@@ -73,7 +74,7 @@ pub const Sink = struct {
 
                     self.buf.applyTag(self.highlighter.get(.cursor), &start, &end);
                 },
-                .edit => {
+                .text_input => {
                     self.skip = false;
                 },
             }
@@ -171,7 +172,7 @@ pub const Sink = struct {
                 }
                 x.cursor_start = null;
             },
-            .edit => |*x| {
+            .text_input => |*x| {
                 if (x.input_start) |p| {
                     p.unref();
                 }
@@ -195,26 +196,22 @@ const ModeState = union(Mode) {
     },
 };
 
-pub fn renderNormal(buf: *gtk.Buffer, root: Tree, cursor_pos: Tree, gpa: Allocator) !void {
-    const sink = Sink.init(buf, cursor_pos.ptr);
+pub fn renderNormal(buf: *gtk.TextBuffer, root: Tree, cursor_pos: Tree, gpa: Allocator) !void {
+    var sink = Sink.init(buf, cursor_pos.ptr, .normal);
     defer sink.deinit();
 
-    sink.mode_state = .{ .normal = null };
-
-    try root.render(gpa, sink);
+    try root.render(gpa, &sink);
 }
 
-pub fn renderTextInput(buf: *gtk.Buffer, root: Tree, cursor_pos: Tree, gpa: Allocator) !Core.EditableRegion {
-    const sink = Sink.init(buf, cursor_pos.ptr);
+pub fn renderTextInput(buf: *gtk.TextBuffer, root: Tree, cursor_pos: Tree, gpa: Allocator) !Core.EditableRegion {
+    var sink = Sink.init(buf, cursor_pos.ptr, .text_input);
     defer sink.deinit();
 
-    sink.mode_state = .{ .text_input = .{ .input_start = null, .input_end = null } };
-
-    try root.render(gpa, sink);
+    try root.render(gpa, &sink);
 
     return switch (sink.mode_state) {
         .normal => unreachable,
-        .text_input => |x| blk: {
+        .text_input => |*x| blk: {
             const start = x.input_start;
             x.input_start = null;
             const end = x.input_end;
