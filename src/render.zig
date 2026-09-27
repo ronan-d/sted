@@ -10,7 +10,7 @@ const Highlighter = highlight.Highlighter;
 const Tag = highlight.Tag;
 const Tree = @import("Tree.zig");
 
-const Sink = struct {
+pub const Sink = struct {
     buf: *gtk.TextBuffer,
     cursor: *anyopaque,
     indentation_level: usize,
