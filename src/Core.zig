@@ -262,16 +262,10 @@ pub fn switchToTextInputMode(self: *Self, f: IdFunc) !void {
 
     self.mode_state = .{ .text_input = .{ .f = f, .editable_region = editable_region } };
 
-    // TODO find better types
-    switch (self.srcprg.sink.mode_state) {
-        .edit => |x| {
-            var cursor: gtk.TextIter = undefined;
-            self.srcprg.sink.buf.getIterAtMark(&cursor, x.input_start.?);
+    var cursor: gtk.TextIter = undefined;
+    self.srcprg.sink.buf.getIterAtMark(&cursor, editable_region.start);
 
-            self.srcprg.sink.buf.placeCursor(&cursor);
-        },
-        .normal => unreachable,
-    }
+    self.srcprg.sink.buf.placeCursor(&cursor);
 }
 
 pub fn switchToNormalMode(self: *Self, f: IdFunc) void {
